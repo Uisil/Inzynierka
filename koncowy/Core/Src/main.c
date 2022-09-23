@@ -108,6 +108,7 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
+	  RxDecoding2();
 	  controlMotor();
     /* USER CODE BEGIN 3 */
   }
