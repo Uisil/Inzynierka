@@ -217,8 +217,3 @@ void testowa()
 		  }*/
 	  }
 }
-
-void controlMotor()
-{
-	printf("asdasd");
-}

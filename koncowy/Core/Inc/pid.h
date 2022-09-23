@@ -101,7 +101,6 @@ void TxDataUART();
 void RxDecoding();
 void RxDecoding2();
 void testowa();
-void controlMotor();
 
 
 #endif /* INC_PID_H_ */
