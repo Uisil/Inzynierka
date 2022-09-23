@@ -99,7 +99,8 @@ int main(void)
   MX_TIM3_Init();
   MX_TIM8_Init();
   /* USER CODE BEGIN 2 */
-  init();
+  initPeripherals();
+  initMotor();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -107,7 +108,7 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-	  testowa();
+	  controlMotor();
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */

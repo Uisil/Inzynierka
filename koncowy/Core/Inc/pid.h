@@ -103,7 +103,8 @@ typedef struct
 	float u_prev;
 }positionControler;
 
-void init();
+void initPeripherals();
+void initMotor();
 void TxDataUART();
 void RxDecoding();
 void RxDecoding2();

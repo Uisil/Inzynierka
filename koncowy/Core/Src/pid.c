@@ -16,16 +16,48 @@ positionControler p_c;
 
 
 
-void init()
+void initPeripherals()
 {
-	  //__HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, 3000);
-	  //HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_1);
-	  //HAL_ADC_Start_DMA(&hadc2, &motor.dmaMeasurCurr, 1);
-	  //HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_SET);
-	  //HAL_UART_Receive_IT(&huart2, &motor.tmpRx, 1);
+	  HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_1);
+	  HAL_ADC_Start_DMA(&hadc2, &m.dmaMeasurCurr, 1);
 	  HAL_UART_Receive_DMA(&huart2, m.tmpData, 1+7*2/*7*6+1*/);
 }
 
+void initMotor()
+{
+	//zatrzymanie silnika
+	mode = DEF_MODE;
+
+	//inicjalizacja parametrow regulatora PID prądu
+	c_c.Kp = 0;
+	c_c.Ti = 0;
+	c_c.Td = 0;
+	c_c.Kff = 0;
+	c_c.Kaw = 0;
+	c_c.sat = 0;
+	c_c.pid_I_prev = 0;
+	c_c.u_prev = 0;
+
+	//inicjalizacja parametrow regulatora PID predkości
+	s_c.Kp = 0;
+	s_c.Ti = 0;
+	s_c.Td = 0;
+	s_c.Kff = 0;
+	s_c.Kaw = 0;
+	s_c.sat = 0;
+	s_c.pid_I_prev = 0;
+	s_c.u_prev = 0;
+
+	//inicjalizacja parametrow regulatora PID położenia
+	p_c.Kp = 0;
+	p_c.Ti = 0;
+	p_c.Td = 0;
+	p_c.Kff = 0;
+	p_c.Kaw = 0;
+	p_c.sat = 0;
+	p_c.pid_I_prev = 0;
+	p_c.u_prev = 0;
+}
 
 
 int __io_putchar(int ch)
