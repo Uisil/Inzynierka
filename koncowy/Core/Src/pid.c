@@ -217,3 +217,8 @@ void testowa()
 		  }*/
 	  }
 }
+
+void controlMotor()
+{
+
+}
