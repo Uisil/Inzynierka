@@ -16,6 +16,7 @@
 #include "gpio.h"
 
 #include <stdio.h>
+#include <stdbool.h>
 
 #define resolution 1024
 #define enkoder_cyclic_cnt 4
@@ -48,8 +49,9 @@ typedef struct
 	float refPos;
 
 	uint16_t idx;
+	bool endMeasurFlag;
 	uint32_t dmaMeasurCurr;
-	float measurCurr;
+	float measurCurr[8000];
 	float measurSpeed[8000];
 	float measurPos[8000];
 
