@@ -21,19 +21,26 @@
 #define enkoder_cyclic_cnt 4
 #define enkoder_freq  15000
 #define Ts 0.000066
-#define INA GPIO_PIN_11
-#define INB GPIO_PIN_7
-
-enum motorMode
+#define INA_PIN GPIO_PIN_11
+#define INB_PIN GPIO_PIN_7
+#define DIR_PORT GPIOA
+typedef enum
 {
 	DEF_MODE,
 	CURR_MODE,
 	SPEED_MODE,
 	POS_MODE,
 	STOP_MODE
-};
+}motorMode;
 
-struct motor
+typedef enum
+{
+	LEFT_DIR,
+	RIGHT_DIR,
+	STOP_DIR
+}Direction;
+
+typedef struct
 {
 	//wartości zadane w unii?
 	float refCurr;
@@ -49,9 +56,9 @@ struct motor
 	uint8_t tmpRx;
 	uint8_t tmpData[1+7*2/*7*6+1*/];
 	uint8_t stateRx;
-};
+}motor;
 
-struct currentControler
+typedef struct
 {
 	float Kp;
 	float Ti;
@@ -64,9 +71,9 @@ struct currentControler
 	float y;
 	float y_curr;
 	float u_prev;
-};
+}currentControler;
 
-struct speedControler
+typedef struct
 {
 	float Kp;
 	float Ti;
@@ -79,9 +86,9 @@ struct speedControler
 	float y;
 	float y_speed;
 	float u_prev;
-};
+}speedControler;
 
-struct positionControler
+typedef struct
 {
 	float Kp;
 	float Ti;
@@ -94,7 +101,7 @@ struct positionControler
 	float y;
 	float y_pos;
 	float u_prev;
-};
+}positionControler;
 
 void init();
 void TxDataUART();
@@ -102,6 +109,8 @@ void RxDecoding();
 void RxDecoding2();
 void testowa();
 void controlMotor();
+void defaultMotorMove();
+void changeDir(Direction dir);
 
 
 #endif /* INC_PID_H_ */
