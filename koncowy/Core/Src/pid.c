@@ -26,7 +26,7 @@ void initPeripherals()
 void initMotor()
 {
 	//zatrzymanie silnika
-	mode = DEF_MODE;
+	mode = STOP_MODE;
 
 	//inicjalizacja parametrow regulatora PID prądu
 	c_c.Kp = 0;
@@ -274,15 +274,15 @@ void defaultMotorMove()
 	static uint32_t tmp = 0;
 	if(__HAL_TIM_GET_COMPARE(&htim8,TIM_CHANNEL_1) == 0) tmp=HAL_GetTick();
 
-	if(tmp<1000)
+	if(HAL_GetTick() - tmp<1000)
 	{
 		changeDir(RIGHT_DIR);
-		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1, 30);
+		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1, 3000);
 	}
-	else if(tmp>=1000 && tmp<2000)
+	else if(HAL_GetTick()-tmp>=1000 && HAL_GetTick()-tmp<2000)
 	{
 		changeDir(LEFT_DIR);
-		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1, 30);
+		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1, 3000);
 	}
 	else
 	{
