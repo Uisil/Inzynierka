@@ -19,8 +19,21 @@ positionControler p_c;
 void initPeripherals()
 {
 	  HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_1);
-	  HAL_UART_Receive_DMA(&huart2, m.tmpData, 1+7*2/*7*6+1*/);
+	  //HAL_UART_Receive_DMA(&huart2, m.tmpData, 1+7*2/*7*6+1*/);
+	  HAL_UARTEx_ReceiveToIdle_DMA(&huart2, m.tmpData, 1+7*2);
 }
+
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+{
+	if(huart == &huart2)
+	{
+		RxDecoding2();
+		//printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refCurr,c_c.Kp,c_c.Ti,c_c.Td,c_c.sat,c_c.Kaw);
+		HAL_UARTEx_ReceiveToIdle_DMA(&huart2, m.tmpData, 1+7*2);
+
+	}
+}
+
 
 void initMotor()
 {
@@ -78,6 +91,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 	{
 		m.measurCurr[m.idx] = -1*(0.00395522*m.dmaMeasurCurr-3.68421159);
 		m.idx++;
+
 		//TxDataUART();
 		//motor.idx++;
 		//if(idx>=8000) motor.idx = 0;
@@ -89,77 +103,6 @@ void TxDataUART()
 	for(int i=0;i<=8000;i++)
 	{
 		printf("%f\n",m.measurCurr[i]);
-	}
-}
-
-
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-{
-	if(huart == &huart2)
-	{
-		//static int nr=0;
-		//motor.tmpData[nr] = motor.tmpRx;
-		//printf("nufka sztuyka: %d\n",motor.tmpRx);
-		/*static uint8_t idx = 0;
-		switch(motor.stateRx)
-		{
-		case 0:
-			if(motor.tmpRx == '0') motorMode = DEF_MODE;
-			if(motor.tmpRx == '1') motorMode = CURR_MODE;
-			if(motor.tmpRx == '2') motorMode = SPEED_MODE;
-			if(motor.tmpRx == '3') motorMode = POS_MODE;
-			motor.stateRx = 1;
-			TxDataUART();
-			break;
-		case 1:
-			if(idx==0) c_c.Kp = (motor.tmpRx-48)*100;
-			if(idx==1) c_c.Kp += (motor.tmpRx-48)*10;
-			if(idx==2) c_c.Kp += (motor.tmpRx-48)*1;
-			if(idx==3) c_c.Kp += (motor.tmpRx-48)*0.1;
-			if(idx==4) c_c.Kp += (motor.tmpRx-48)*0.01;
-			if(idx==5)
-			{
-				c_c.Kp = (motor.tmpRx-48)*0.001;
-				idx=0;
-				motor.stateRx = 2;
-			}
-			idx++;
-			TxDataUART();
-			break;
-		case 2:
-			if(idx==0) c_c.Ti = (motor.tmpRx-48)*100;
-			if(idx==1) c_c.Ti = (motor.tmpRx-48)*10;
-			if(idx==2) c_c.Ti = (motor.tmpRx-48)*1;
-			if(idx==3) c_c.Ti = (motor.tmpRx-48)*0.1;
-			if(idx==4) c_c.Ti = (motor.tmpRx-48)*0.01;
-			if(idx==5)
-			{
-				c_c.Ti = (motor.tmpRx-48)*0.001;
-				idx=0;
-				motor.stateRx = 3;
-			}
-			idx++;
-			TxDataUART();
-			break;
-		case 3:
-			if(idx==0) c_c.Td = (motor.tmpRx-48)*100;
-			if(idx==1) c_c.Td = (motor.tmpRx-48)*10;
-			if(idx==2) c_c.Td = (motor.tmpRx-48)*1;
-			if(idx==3) c_c.Td = (motor.tmpRx-48)*0.1;
-			if(idx==4) c_c.Td = (motor.tmpRx-48)*0.01;
-			if(idx==5)
-			{
-				c_c.Td = (motor.tmpRx-48)*0.001;
-				idx=0;
-				motor.stateRx = 0;
-			}
-			idx++;
-			TxDataUART();
-			break;
-		default:
-			break;
-		}*/
-		//HAL_UART_Receive_IT(&huart2, &motor.tmpRx, 1);
 	}
 }
 
@@ -310,6 +253,7 @@ void controlMotor()
 		defaultMotorMove();
 		break;
 	case CURR_MODE:
+		HAL_ADC_Start_DMA(&hadc2, &m.dmaMeasurCurr, 1);
 		break;
 	case SPEED_MODE:
 		break;

@@ -108,7 +108,7 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-	  testowa();
+	  //testowa();
 	  controlMotor();
 	  measurTx();
     /* USER CODE BEGIN 3 */
