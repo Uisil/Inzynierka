@@ -244,7 +244,7 @@ void testowa()
 	  if(!HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin))
 	  {
 		  RxDecoding2();
-		  printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refCurr,c_c.Kp,c_c.Ti,c_c.Td,c_c.sat,c_c.Kaw);
+		  //printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refCurr,c_c.Kp,c_c.Ti,c_c.Td,c_c.sat,c_c.Kaw);
 		  if(m.endMeasurFlag == true)
 		  {
 			  for(int i=0;i<=8000;i++)
