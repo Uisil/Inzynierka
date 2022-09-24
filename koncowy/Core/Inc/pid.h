@@ -108,6 +108,7 @@ typedef struct
 void initPeripherals();
 void initMotor();
 void TxDataUART();
+void measurTx();
 void RxDecoding();
 void RxDecoding2();
 void testowa();

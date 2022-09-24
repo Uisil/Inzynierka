@@ -110,6 +110,7 @@ int main(void)
     /* USER CODE END WHILE */
 	  testowa();
 	  controlMotor();
+	  measurTx();
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */

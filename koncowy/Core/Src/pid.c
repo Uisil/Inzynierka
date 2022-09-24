@@ -245,13 +245,18 @@ void testowa()
 	  {
 		  RxDecoding2();
 		  //printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refCurr,c_c.Kp,c_c.Ti,c_c.Td,c_c.sat,c_c.Kaw);
-		  if(m.endMeasurFlag == true)
+	  }
+}
+
+void measurTx()
+{
+	  if(m.endMeasurFlag == true && __HAL_TIM_GET_COMPARE(&htim8,TIM_CHANNEL_1) == 0)
+	  {
+		  for(int i=0;i<=8000;i++)
 		  {
-			  for(int i=0;i<=8000;i++)
-			  {
-				  printf("%f\n",m.measurCurr[i]);
-			  }
+			  printf("%f\n",m.measurCurr[i]);
 		  }
+		  m.endMeasurFlag = false;
 	  }
 }
 
