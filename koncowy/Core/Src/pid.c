@@ -38,18 +38,19 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 void initMotor()
 {
 	//zatrzymanie silnika
-	mode = STOP_MODE;
+	mode = CURR_MODE;
 	m.endMeasurFlag = false;
 
 	//inicjalizacja parametrow regulatora PID prądu
-	c_c.Kp = 0;
-	c_c.Ti = 0;
+	c_c.Kp = 0.8;
+	c_c.Ti = 0.01;
 	c_c.Td = 0;
 	c_c.Kff = 0;
 	c_c.Kaw = 0;
-	c_c.sat = 0;
+	c_c.sat = 1;
 	c_c.pid_I_prev = 0;
 	c_c.u_prev = 0;
+	m.refCurr = 0.5;
 
 	//inicjalizacja parametrow regulatora PID predkości
 	s_c.Kp = 0;
@@ -90,6 +91,10 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 	if(hadc->Instance == ADC2)
 	{
 		m.measurCurr[m.idx] = -1*(0.00395522*m.dmaMeasurCurr-3.68421159);
+		if(mode == CURR_MODE)
+		{
+			regulator_PID_curr();
+		}
 		m.idx++;
 
 		//TxDataUART();
@@ -199,6 +204,14 @@ void measurTx()
 		  {
 			  printf("%f\n",m.measurCurr[i]);
 		  }
+		  for(int i=0;i<=8000;i++)
+		  {
+			  printf("%f\n",m.measurSpeed[i]);
+		  }
+		  for(uint32_t i=0;i<=8000;i++)
+		  {
+			  printf("%f\n",m.measurSpeed[i]);
+		  }
 		  m.endMeasurFlag = false;
 	  }
 }
@@ -244,6 +257,21 @@ void defaultMotorMove()
 	}
 }
 
+void controlMotorMove()
+{
+	static uint32_t tmp = 0;
+	if(__HAL_TIM_GET_COMPARE(&htim8,TIM_CHANNEL_1) == 0) tmp=HAL_GetTick();
+
+	if(HAL_GetTick() - tmp<400)
+	{
+
+	}
+	else
+	{
+		m.endMeasurFlag = true;
+		mode = STOP_MODE;
+	}
+}
 void controlMotor()
 {
 	switch(mode)
@@ -254,6 +282,7 @@ void controlMotor()
 		break;
 	case CURR_MODE:
 		HAL_ADC_Start_DMA(&hadc2, &m.dmaMeasurCurr, 1);
+		controlMotorMove();
 		break;
 	case SPEED_MODE:
 		break;
@@ -267,5 +296,37 @@ void controlMotor()
 		break;
 	default:
 		break;
+	}
+}
+
+void regulator_PID_curr()
+{
+	static uint16_t new_pwm = 0;
+	float e = m.refCurr - m.measurCurr[m.idx];
+
+	float pid_P = c_c.Kp*e;
+	float pid_I = c_c.pid_I_prev + Ts*(e*c_c.Kp-c_c.Kaw*(c_c.y-c_c.y_curr));
+	float pid_D = (e*c_c.Kp-c_c.u_prev)/Ts;
+
+	c_c.pid_I_prev = pid_I;
+	c_c.u_prev = pid_P;
+
+	c_c.y = pid_P + pid_I/c_c.Ti + pid_D*c_c.Td;
+
+	if(c_c.y > c_c.sat) c_c.y_curr = c_c.sat;
+	else if(c_c.y < -c_c.sat) c_c.y_curr = -c_c.sat;
+	else c_c.y_curr = c_c.y;
+
+	if(c_c.y_curr>=0)
+	{
+		changeDir(LEFT_DIR);
+		new_pwm = (uint16_t)(6000*c_c.y_curr);
+		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,new_pwm);
+	}
+	else
+	{
+		changeDir(RIGHT_DIR);
+		new_pwm = (uint16_t)(-6000*c_c.y_curr);
+		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1, new_pwm);
 	}
 }

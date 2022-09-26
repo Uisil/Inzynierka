@@ -114,7 +114,9 @@ void RxDecoding2();
 void testowa();
 void controlMotor();
 void defaultMotorMove();
+void controlMotorMove();
 void changeDir(Direction dir);
+void regulator_PID_curr();
 
 
 #endif /* INC_PID_H_ */
