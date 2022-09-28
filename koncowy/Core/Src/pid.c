@@ -13,11 +13,14 @@ motor m;
 currentControler c_c;
 speedControler s_c;
 positionControler p_c;
+int32_t enkoder_tmp = 0;
+int32_t enkoder_cnt = 0;
 
 
 
 void initPeripherals()
 {
+	HAL_TIM_Encoder_Start(&htim1, TIM_CHANNEL_ALL);
 	  HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_1);
 	  //HAL_UART_Receive_DMA(&huart2, m.tmpData, 1+7*2/*7*6+1*/);
 	  HAL_UARTEx_ReceiveToIdle_DMA(&huart2, m.tmpData, 1+7*2);
@@ -38,7 +41,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 void initMotor()
 {
 	//zatrzymanie silnika
-	mode = CURR_MODE;
+	mode = STOP_MODE;
 	m.endMeasurFlag = false;
 
 	//inicjalizacja parametrow regulatora PID prądu
@@ -85,12 +88,44 @@ int __io_putchar(int ch)
   return 1;
 }
 
+void speed_motor_calc()
+{
+	static int16_t ringbuffer[100] = {0};
+	static uint32_t idx = 0;
+	static int32_t tmp = 0;
+	static int32_t diff = 0;
+
+	// rzutowanie na int16 daje zakres od -100 do 100;
+	enkoder_cnt = (int16_t)__HAL_TIM_GET_COUNTER(&htim1);
+
+	if(idx++ >= 100) idx = 0;
+
+	tmp = ringbuffer[idx];
+	ringbuffer[idx] = enkoder_cnt;
+
+	diff = (enkoder_cnt - tmp);
+	enkoder_tmp +=diff;
+	/*if(diff>1500)
+	{
+		diff = -32768-tmp-(32768-enkoder_cnt);
+		enkoder_tmp -= 32768;
+	}
+	if(diff<-1500)
+	{
+		diff = 32768-tmp+(32768+enkoder_cnt);
+		enkoder_tmp += 32768;
+	}*/
+	m.measurPos[m.idx] = (float)enkoder_tmp/(resolution*enkoder_cyclic_cnt);
+	//s_m.speed = (float)s_m.enkoder_cnt * enkoder_freq * 60/(resolution*enkoder_cyclic_cnt);
+	m.measurSpeed[m.idx] = (60*(float)diff*enkoder_freq/99)/(resolution*enkoder_cyclic_cnt);
+}
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
 	if(hadc->Instance == ADC2)
 	{
 		m.measurCurr[m.idx] = -1*(0.00395522*m.dmaMeasurCurr-3.68421159);
+		speed_motor_calc();
 		if(mode == CURR_MODE)
 		{
 			regulator_PID_curr();
@@ -185,6 +220,7 @@ void RxDecoding2()
 	c_c.Td = (float)((m.tmpData[9]<<8) + m.tmpData[10])/1000;
 	c_c.Kff = (float)((m.tmpData[11]<<8) + m.tmpData[12])/1000;
 	c_c.Kaw = (float)((m.tmpData[13]<<8) + m.tmpData[14])/1000;
+	printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refCurr,c_c.Kp,c_c.Ti,c_c.Td,c_c.sat,c_c.Kaw);
 }
 
 void testowa()
@@ -210,7 +246,7 @@ void measurTx()
 		  }
 		  for(uint32_t i=0;i<=8000;i++)
 		  {
-			  printf("%f\n",m.measurSpeed[i]);
+			  printf("%f\n",m.measurPos[i]);
 		  }
 		  m.endMeasurFlag = false;
 	  }

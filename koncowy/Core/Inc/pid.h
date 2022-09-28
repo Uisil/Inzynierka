@@ -117,6 +117,7 @@ void defaultMotorMove();
 void controlMotorMove();
 void changeDir(Direction dir);
 void regulator_PID_curr();
+void speed_motor_calc();
 
 
 #endif /* INC_PID_H_ */
