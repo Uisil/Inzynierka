@@ -23,7 +23,7 @@ void initPeripherals()
 	HAL_TIM_Encoder_Start(&htim1, TIM_CHANNEL_ALL);
 	  HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_1);
 	  //HAL_UART_Receive_DMA(&huart2, m.tmpData, 1+7*2/*7*6+1*/);
-	  HAL_UARTEx_ReceiveToIdle_DMA(&huart2, m.tmpData, 1+7*2);
+	  HAL_UARTEx_ReceiveToIdle_DMA(&huart2, m.tmpData, 1+21*2);
 }
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
@@ -32,7 +32,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 	{
 		RxDecoding2();
 		//printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refCurr,c_c.Kp,c_c.Ti,c_c.Td,c_c.sat,c_c.Kaw);
-		HAL_UARTEx_ReceiveToIdle_DMA(&huart2, m.tmpData, 1+7*2);
+		HAL_UARTEx_ReceiveToIdle_DMA(&huart2, m.tmpData, 1+21*2);
 
 	}
 }
@@ -41,7 +41,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 void initMotor()
 {
 	//zatrzymanie silnika
-	mode = SPEED_MODE;
+	mode = STOP_MODE;
 	m.endMeasurFlag = false;
 
 	//inicjalizacja parametrow regulatora PID prądu
@@ -67,14 +67,15 @@ void initMotor()
 	m.refSpeed = 1000;
 
 	//inicjalizacja parametrow regulatora PID położenia
-	p_c.Kp = 0;
-	p_c.Ti = 0;
+	p_c.Kp = 10;
+	p_c.Ti = 10000000000;
 	p_c.Td = 0;
 	p_c.Kff = 0;
 	p_c.Kaw = 0;
-	p_c.sat = 0;
+	p_c.sat = 3000;
 	p_c.pid_I_prev = 0;
 	p_c.u_prev = 0;
+	m.refPos = 1;
 }
 
 
@@ -133,6 +134,12 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 		}
 		if(mode == SPEED_MODE)
 		{
+			regulator_PID_speed();
+			regulator_PID_curr();
+		}
+		if(mode == POS_MODE)
+		{
+			regulator_PID_pos();
 			regulator_PID_speed();
 			regulator_PID_curr();
 		}
@@ -226,7 +233,25 @@ void RxDecoding2()
 	c_c.Td = (float)((m.tmpData[9]<<8) + m.tmpData[10])/1000;
 	c_c.Kff = (float)((m.tmpData[11]<<8) + m.tmpData[12])/1000;
 	c_c.Kaw = (float)((m.tmpData[13]<<8) + m.tmpData[14])/1000;
+
+	m.refSpeed = (float)((m.tmpData[15]<<8) + m.tmpData[16]);
+	//c_c.Ti = (float)((motor.tmpData[17]<<8) + motor.tmpData[18])/1000;
+	s_c.Kp = (float)((m.tmpData[19]<<8) + m.tmpData[20])/1000;
+	s_c.Ti = (float)((m.tmpData[21]<<8) + m.tmpData[22])/1000;
+	s_c.Td = (float)((m.tmpData[23]<<8) + m.tmpData[24])/1000;
+	s_c.Kff = (float)((m.tmpData[25]<<8) + m.tmpData[26])/1000;
+	s_c.Kaw = (float)((m.tmpData[27]<<8) + m.tmpData[28])/1000;
+
+	m.refPos = (float)((m.tmpData[29]<<8) + m.tmpData[30])/1000;
+	//c_c.Ti = (float)((motor.tmpData[31]<<8) + motor.tmpData[32])/1000;
+	p_c.Kp = (float)((m.tmpData[33]<<8) + m.tmpData[34])/1000;
+	p_c.Ti = (float)((m.tmpData[35]<<8) + m.tmpData[36])/1000;
+	p_c.Td = (float)((m.tmpData[37]<<8) + m.tmpData[38])/1000;
+	p_c.Kff = (float)((m.tmpData[39]<<8) + m.tmpData[40])/1000;
+	p_c.Kaw = (float)((m.tmpData[41]<<8) + m.tmpData[42])/1000;
 	printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refCurr,c_c.Kp,c_c.Ti,c_c.Td,c_c.sat,c_c.Kaw);
+	printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refSpeed,s_c.Kp,s_c.Ti,s_c.Td,s_c.sat,s_c.Kaw);
+	printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refPos,p_c.Kp,p_c.Ti,p_c.Td,p_c.sat,p_c.Kaw);
 }
 
 void testowa()
@@ -331,6 +356,8 @@ void controlMotor()
 		controlMotorMove();
 		break;
 	case POS_MODE:
+		HAL_ADC_Start_DMA(&hadc2, &m.dmaMeasurCurr, 1);
+		controlMotorMove();
 		break;
 	case STOP_MODE:
 		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,0);
@@ -394,4 +421,25 @@ void regulator_PID_speed()
 	else s_c.y_speed = s_c.y;
 
 	m.refCurr = s_c.y_speed;
+}
+
+
+void regulator_PID_pos()
+{
+	float e = m.refPos - m.measurPos[m.idx];
+
+	float pid_P = p_c.Kp*e;
+	float pid_I = p_c.pid_I_prev + Ts*(e*p_c.Kp-p_c.Kaw*(p_c.y-p_c.y_pos));
+	float pid_D = (e*p_c.Kp-p_c.u_prev)/Ts;
+
+	p_c.pid_I_prev = pid_I;
+	p_c.u_prev = pid_P;
+
+	p_c.y = pid_P + pid_I/p_c.Ti + pid_D*p_c.Td;
+
+	if(p_c.y > p_c.sat) p_c.y_pos = p_c.sat;
+	else if(p_c.y < -p_c.sat) p_c.y_pos = -p_c.sat;
+	else p_c.y_pos = p_c.y;
+
+	m.refSpeed = p_c.y_pos;
 }

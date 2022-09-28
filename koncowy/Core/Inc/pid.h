@@ -56,7 +56,7 @@ typedef struct
 	float measurPos[8000];
 
 	uint8_t tmpRx;
-	uint8_t tmpData[1+7*2/*7*6+1*/];
+	uint8_t tmpData[1+21*2/*7*6+1*/];
 	uint8_t stateRx;
 }motor;
 
@@ -118,6 +118,7 @@ void controlMotorMove();
 void changeDir(Direction dir);
 void regulator_PID_curr();
 void regulator_PID_speed();
+void regulator_PID_pos();
 void speed_motor_calc();
 
 
