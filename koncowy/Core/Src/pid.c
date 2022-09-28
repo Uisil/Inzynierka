@@ -41,7 +41,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 void initMotor()
 {
 	//zatrzymanie silnika
-	mode = STOP_MODE;
+	mode = SPEED_MODE;
 	m.endMeasurFlag = false;
 
 	//inicjalizacja parametrow regulatora PID prądu
@@ -56,14 +56,15 @@ void initMotor()
 	m.refCurr = 0.5;
 
 	//inicjalizacja parametrow regulatora PID predkości
-	s_c.Kp = 0;
-	s_c.Ti = 0;
+	s_c.Kp = 1;
+	s_c.Ti = 100000000000;
 	s_c.Td = 0;
 	s_c.Kff = 0;
 	s_c.Kaw = 0;
-	s_c.sat = 0;
+	s_c.sat = 3.3;
 	s_c.pid_I_prev = 0;
 	s_c.u_prev = 0;
+	m.refSpeed = 1000;
 
 	//inicjalizacja parametrow regulatora PID położenia
 	p_c.Kp = 0;
@@ -128,6 +129,11 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 		speed_motor_calc();
 		if(mode == CURR_MODE)
 		{
+			regulator_PID_curr();
+		}
+		if(mode == SPEED_MODE)
+		{
+			regulator_PID_speed();
 			regulator_PID_curr();
 		}
 		m.idx++;
@@ -321,6 +327,8 @@ void controlMotor()
 		controlMotorMove();
 		break;
 	case SPEED_MODE:
+		HAL_ADC_Start_DMA(&hadc2, &m.dmaMeasurCurr, 1);
+		controlMotorMove();
 		break;
 	case POS_MODE:
 		break;
@@ -365,4 +373,25 @@ void regulator_PID_curr()
 		new_pwm = (uint16_t)(-6000*c_c.y_curr);
 		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1, new_pwm);
 	}
+}
+
+
+void regulator_PID_speed()
+{
+	float e = m.refSpeed - m.measurSpeed[m.idx];
+
+	float pid_P = s_c.Kp*e;
+	float pid_I = s_c.pid_I_prev + Ts*(e*s_c.Kp-s_c.Kaw*(s_c.y-s_c.y_speed));
+	float pid_D = (e*s_c.Kp-s_c.u_prev)/Ts;
+
+	s_c.pid_I_prev = pid_I;
+	s_c.u_prev = pid_P;
+
+	s_c.y = pid_P + pid_I/s_c.Ti + pid_D*s_c.Td;
+
+	if(s_c.y > s_c.sat) s_c.y_speed = s_c.sat;
+	else if(s_c.y < -s_c.sat) s_c.y_speed = -s_c.sat;
+	else s_c.y_speed = s_c.y;
+
+	m.refCurr = s_c.y_speed;
 }

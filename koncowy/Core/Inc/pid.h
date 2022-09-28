@@ -117,6 +117,7 @@ void defaultMotorMove();
 void controlMotorMove();
 void changeDir(Direction dir);
 void regulator_PID_curr();
+void regulator_PID_speed();
 void speed_motor_calc();
 
 
