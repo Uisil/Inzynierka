@@ -21,6 +21,7 @@ int32_t enkoder_cnt = 0;
 void initPeripherals()
 {
 	HAL_TIM_Encoder_Start(&htim1, TIM_CHANNEL_ALL);
+	__HAL_TIM_SET_COUNTER(&htim1,0);
 	  HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_1);
 	  //HAL_UART_Receive_DMA(&huart2, m.tmpData, 1+7*2/*7*6+1*/);
 	  HAL_UARTEx_ReceiveToIdle_DMA(&huart2, m.tmpData, 1+21*2);
@@ -41,7 +42,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 void initMotor()
 {
 	//zatrzymanie silnika
-	mode = STOP_MODE;
+	mode = FREE_MODE;
 	m.endMeasurFlag = false;
 
 	//inicjalizacja parametrow regulatora PID prądu
@@ -98,15 +99,13 @@ void speed_motor_calc()
 	static int32_t diff = 0;
 
 	// rzutowanie na int16 daje zakres od -100 do 100;
+	static int16_t enkoder_cnt_old = 0;
 	enkoder_cnt = (int16_t)__HAL_TIM_GET_COUNTER(&htim1);
 
-	if(idx++ >= 100) idx = 0;
-
-	tmp = ringbuffer[idx];
-	ringbuffer[idx] = enkoder_cnt;
-
-	diff = (enkoder_cnt - tmp);
-	enkoder_tmp +=diff;
+	diff = (enkoder_cnt - enkoder_cnt_old);
+	enkoder_tmp += diff;
+	enkoder_cnt_old = enkoder_cnt;
+	m.measurPos[m.idx] = (float)enkoder_cnt;//(float)enkoder_tmp/(resolution*enkoder_cyclic_cnt);
 	/*if(diff>1500)
 	{
 		diff = -32768-tmp-(32768-enkoder_cnt);
@@ -117,8 +116,14 @@ void speed_motor_calc()
 		diff = 32768-tmp+(32768+enkoder_cnt);
 		enkoder_tmp += 32768;
 	}*/
-	m.measurPos[m.idx] = (float)enkoder_tmp/(resolution*enkoder_cyclic_cnt);
 	//s_m.speed = (float)s_m.enkoder_cnt * enkoder_freq * 60/(resolution*enkoder_cyclic_cnt);
+
+	if(++idx >= 100) idx = 0;
+
+	tmp = ringbuffer[idx];
+	ringbuffer[idx] = enkoder_cnt;
+
+	diff = (enkoder_cnt - tmp);
 	m.measurSpeed[m.idx] = (60*(float)diff*enkoder_freq/99)/(resolution*enkoder_cyclic_cnt);
 }
 
@@ -143,7 +148,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 			regulator_PID_speed();
 			regulator_PID_curr();
 		}
-		m.idx++;
+		if(++m.idx >= 8000) m.idx = 0;
 
 		//TxDataUART();
 		//motor.idx++;
@@ -249,9 +254,9 @@ void RxDecoding2()
 	p_c.Td = (float)((m.tmpData[37]<<8) + m.tmpData[38])/1000;
 	p_c.Kff = (float)((m.tmpData[39]<<8) + m.tmpData[40])/1000;
 	p_c.Kaw = (float)((m.tmpData[41]<<8) + m.tmpData[42])/1000;
-	printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refCurr,c_c.Kp,c_c.Ti,c_c.Td,c_c.sat,c_c.Kaw);
-	printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refSpeed,s_c.Kp,s_c.Ti,s_c.Td,s_c.sat,s_c.Kaw);
-	printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refPos,p_c.Kp,p_c.Ti,p_c.Td,p_c.sat,p_c.Kaw);
+	//printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refCurr,c_c.Kp,c_c.Ti,c_c.Td,c_c.sat,c_c.Kaw);
+	//printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refSpeed,s_c.Kp,s_c.Ti,s_c.Td,s_c.sat,s_c.Kaw);
+	//printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refPos,p_c.Kp,p_c.Ti,p_c.Td,p_c.sat,p_c.Kaw);
 }
 
 void testowa()
@@ -267,18 +272,42 @@ void measurTx()
 {
 	  if(m.endMeasurFlag == true && __HAL_TIM_GET_COMPARE(&htim8,TIM_CHANNEL_1) == 0)
 	  {
+//		  for(int i=0;i<=8000;i++)
+//		  {
+//			  printf("%f\n",m.measurCurr[i]);
+//		  }
+//		  for(int i=0;i<=8000;i++)
+//		  {
+//			  printf("%f\n",m.measurSpeed[i]);
+//		  }
+//		  for(uint32_t i=0;i<=8000;i++)
+//		  {
+//			  printf("%f\n",m.measurPos[i]);
+//		  }
+
+		  uint8_t tmp[2+4*sizeof(float)];
+		  uint8_t *ptr;
+		  float time = 0;
 		  for(int i=0;i<=8000;i++)
 		  {
-			  printf("%f\n",m.measurCurr[i]);
+			  time = i*Ts;
+			  // AA 55 ILE B1 B2 ... Bn
+
+			  tmp[0] = 0xAA;
+			  tmp[1] = 0x55;
+
+			  ptr = (uint8_t *)&time;
+			  for(uint8_t j = 0; j < sizeof(float); j++)		tmp[2+0*sizeof(float) + j] = ptr[j];
+			  ptr = (uint8_t *)&time;//m.measurCurr[i];
+			  for(uint8_t j = 0; j < sizeof(float); j++)		tmp[2+1*sizeof(float) + j] = ptr[j];
+			  ptr = (uint8_t *)&m.measurSpeed[i];
+			  for(uint8_t j = 0; j < sizeof(float); j++)		tmp[2+2*sizeof(float) + j] = ptr[j];
+			  ptr = (uint8_t *)&m.measurPos[i];
+			  for(uint8_t j = 0; j < sizeof(float); j++)		tmp[2+3*sizeof(float) + j] = ptr[j];
+
+			  HAL_UART_Transmit(&huart2, tmp, 18, HAL_MAX_DELAY);
 		  }
-		  for(int i=0;i<=8000;i++)
-		  {
-			  printf("%f\n",m.measurSpeed[i]);
-		  }
-		  for(uint32_t i=0;i<=8000;i++)
-		  {
-			  printf("%f\n",m.measurPos[i]);
-		  }
+
 		  m.endMeasurFlag = false;
 	  }
 }
@@ -305,7 +334,7 @@ void changeDir(Direction dir)
 void defaultMotorMove()
 {
 	static uint32_t tmp = 0;
-	if(__HAL_TIM_GET_COMPARE(&htim8,TIM_CHANNEL_1) == 0) tmp=HAL_GetTick();
+	if(tmp == 0) tmp=HAL_GetTick();
 
 	if(HAL_GetTick() - tmp<200)
 	{
@@ -315,7 +344,7 @@ void defaultMotorMove()
 	else if(HAL_GetTick()-tmp>=200 && HAL_GetTick()-tmp<400)
 	{
 		changeDir(LEFT_DIR);
-		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1, 3000);
+		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1, 0);
 	}
 	else
 	{
@@ -358,6 +387,9 @@ void controlMotor()
 	case POS_MODE:
 		HAL_ADC_Start_DMA(&hadc2, &m.dmaMeasurCurr, 1);
 		controlMotorMove();
+		break;
+	case FREE_MODE:
+		HAL_ADC_Start_DMA(&hadc2, &m.dmaMeasurCurr, 1);
 		break;
 	case STOP_MODE:
 		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,0);

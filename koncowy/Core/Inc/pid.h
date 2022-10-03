@@ -31,7 +31,8 @@ typedef enum
 	CURR_MODE,
 	SPEED_MODE,
 	POS_MODE,
-	STOP_MODE
+	STOP_MODE,
+	FREE_MODE
 }motorMode;
 
 typedef enum
