@@ -42,23 +42,24 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 void initMotor()
 {
 	//zatrzymanie silnika
-	mode = FREE_MODE;
+	mode = DEF_MODE;
 	m.endMeasurFlag = false;
+	m.moveInProgress = false;
 
 	//inicjalizacja parametrow regulatora PID prądu
 	c_c.Kp = 0.8;
 	c_c.Ti = 0.01;
 	c_c.Td = 0;
 	c_c.Kff = 0;
-	c_c.Kaw = 0;
+	c_c.Kaw = 5;
 	c_c.sat = 1;
 	c_c.pid_I_prev = 0;
 	c_c.u_prev = 0;
 	m.refCurr = 0.5;
 
 	//inicjalizacja parametrow regulatora PID predkości
-	s_c.Kp = 1;
-	s_c.Ti = 100000000000;
+	s_c.Kp = 10;
+	s_c.Ti = 0.1;
 	s_c.Td = 0;
 	s_c.Kff = 0;
 	s_c.Kaw = 0;
@@ -124,7 +125,7 @@ void speed_motor_calc()
 	ringbuffer[idx] = enkoder_cnt;
 
 	diff = (enkoder_cnt - tmp);
-	m.measurSpeed[m.idx] = (60*(float)diff*enkoder_freq/99)/(resolution*enkoder_cyclic_cnt);
+	m.measurSpeed[m.idx] = (60*(float)diff*enkoder_freq/100)/(resolution*enkoder_cyclic_cnt);
 }
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
@@ -148,7 +149,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 			regulator_PID_speed();
 			regulator_PID_curr();
 		}
-		if(++m.idx >= 8000) m.idx = 0;
+		if(++m.idx >= 8000) m.idx = 8000;
 
 		//TxDataUART();
 		//motor.idx++;
@@ -298,7 +299,7 @@ void measurTx()
 
 			  ptr = (uint8_t *)&time;
 			  for(uint8_t j = 0; j < sizeof(float); j++)		tmp[2+0*sizeof(float) + j] = ptr[j];
-			  ptr = (uint8_t *)&time;//m.measurCurr[i];
+			  ptr = (uint8_t *)&m.measurCurr[i];
 			  for(uint8_t j = 0; j < sizeof(float); j++)		tmp[2+1*sizeof(float) + j] = ptr[j];
 			  ptr = (uint8_t *)&m.measurSpeed[i];
 			  for(uint8_t j = 0; j < sizeof(float); j++)		tmp[2+2*sizeof(float) + j] = ptr[j];
@@ -333,22 +334,29 @@ void changeDir(Direction dir)
 
 void defaultMotorMove()
 {
-	static uint32_t tmp = 0;
-	if(tmp == 0) tmp=HAL_GetTick();
 
+	static uint32_t tmp = 0;
+	if(m.moveInProgress == false) tmp=HAL_GetTick();
+
+	m.moveInProgress = true;
 	if(HAL_GetTick() - tmp<200)
+	{
+		changeDir(LEFT_DIR);
+		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1, 3000);
+	}
+	else if((HAL_GetTick()-tmp>=200) && (HAL_GetTick()-tmp<400))
 	{
 		changeDir(RIGHT_DIR);
 		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1, 3000);
 	}
-	else if(HAL_GetTick()-tmp>=200 && HAL_GetTick()-tmp<400)
-	{
-		changeDir(LEFT_DIR);
-		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1, 0);
-	}
 	else
 	{
+		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,0);
+		changeDir(STOP_DIR);
+		HAL_ADC_Stop_DMA(&hadc2);
+		m.idx = 0;
 		m.endMeasurFlag = true;
+		m.moveInProgress = false;
 		mode = STOP_MODE;
 	}
 }
@@ -356,15 +364,21 @@ void defaultMotorMove()
 void controlMotorMove()
 {
 	static uint32_t tmp = 0;
-	if(__HAL_TIM_GET_COMPARE(&htim8,TIM_CHANNEL_1) == 0) tmp=HAL_GetTick();
+	if(m.moveInProgress == false) tmp=HAL_GetTick();
 
+	m.moveInProgress = true;
 	if(HAL_GetTick() - tmp<400)
 	{
 
 	}
 	else
 	{
+		HAL_ADC_Stop_DMA(&hadc2);
+		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,0);
+		changeDir(STOP_DIR);
+		m.idx = 0;
 		m.endMeasurFlag = true;
+		m.moveInProgress = false;
 		mode = STOP_MODE;
 	}
 }
@@ -440,8 +454,8 @@ void regulator_PID_speed()
 	float e = m.refSpeed - m.measurSpeed[m.idx];
 
 	float pid_P = s_c.Kp*e;
-	float pid_I = s_c.pid_I_prev + Ts*(e*s_c.Kp-s_c.Kaw*(s_c.y-s_c.y_speed));
-	float pid_D = (e*s_c.Kp-s_c.u_prev)/Ts;
+	float pid_I = s_c.pid_I_prev + TsSpeed*(e*s_c.Kp-s_c.Kaw*(s_c.y-s_c.y_speed));
+	float pid_D = (e*s_c.Kp-s_c.u_prev)/TsSpeed;
 
 	s_c.pid_I_prev = pid_I;
 	s_c.u_prev = pid_P;

@@ -22,6 +22,7 @@
 #define enkoder_cyclic_cnt 4
 #define enkoder_freq  15000
 #define Ts 0.000066
+#define TsSpeed 0.000660
 #define INA_PIN GPIO_PIN_11
 #define INB_PIN GPIO_PIN_7
 #define DIR_PORT GPIOA
@@ -51,6 +52,7 @@ typedef struct
 
 	uint16_t idx;
 	bool endMeasurFlag;
+	bool moveInProgress;
 	uint32_t dmaMeasurCurr;
 	float measurCurr[8000];
 	float measurSpeed[8000];
