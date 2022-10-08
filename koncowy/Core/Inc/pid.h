@@ -123,6 +123,8 @@ void regulator_PID_curr();
 void regulator_PID_speed();
 void regulator_PID_pos();
 void speed_motor_calc();
+void resetPID();
+void resetData();
 
 
 #endif /* INC_PID_H_ */

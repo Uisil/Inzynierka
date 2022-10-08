@@ -15,6 +15,11 @@ speedControler s_c;
 positionControler p_c;
 int32_t enkoder_tmp = 0;
 int32_t enkoder_cnt = 0;
+int16_t enkoder_cnt_old = 0;
+int16_t ringbuffer[100] = {0};
+uint32_t idx = 0;
+int32_t tmp = 0;
+int32_t diff = 0;
 
 
 
@@ -80,6 +85,39 @@ void initMotor()
 	m.refPos = 1;
 }
 
+void resetPID()
+{
+	c_c.pid_I_prev = 0;
+	c_c.u_prev = 0;
+
+	s_c.pid_I_prev = 0;
+	s_c.u_prev = 0;
+
+	p_c.pid_I_prev = 0;
+	p_c.u_prev = 0;
+
+	__HAL_TIM_SET_COUNTER(&htim1,0);
+}
+
+void resetData()
+{
+    for(int i = 0;i<=8000-1;i++)
+    {
+        m.measurCurr[i] = 0;
+        m.measurSpeed[i] = 0;
+        m.measurPos[i] = 0;
+    }
+    for(int i = 0;i<=100-1;i++)
+    {
+    	ringbuffer[i] = 0;
+    }
+    enkoder_tmp = 0;
+    enkoder_cnt = 0;
+    enkoder_cnt_old = 0;
+    idx = 0;
+    tmp = 0;
+    diff = 0;
+}
 
 int __io_putchar(int ch)
 {
@@ -94,13 +132,8 @@ int __io_putchar(int ch)
 
 void speed_motor_calc()
 {
-	static int16_t ringbuffer[100] = {0};
-	static uint32_t idx = 0;
-	static int32_t tmp = 0;
-	static int32_t diff = 0;
 
 	// rzutowanie na int16 daje zakres od -100 do 100;
-	static int16_t enkoder_cnt_old = 0;
 	enkoder_cnt = (int16_t)__HAL_TIM_GET_COUNTER(&htim1);
 
 	diff = (enkoder_cnt - enkoder_cnt_old);
@@ -255,6 +288,10 @@ void RxDecoding2()
 	p_c.Td = (float)((m.tmpData[37]<<8) + m.tmpData[38])/1000;
 	p_c.Kff = (float)((m.tmpData[39]<<8) + m.tmpData[40])/1000;
 	p_c.Kaw = (float)((m.tmpData[41]<<8) + m.tmpData[42])/1000;
+
+	// wyłączanie całkowania jeżeli użytkownik wprowadzi wartość 0
+	float tmpDecoding = c_c.Ti - 0;
+	if(tmpDecoding<0.00001) c_c.Ti = 100000000;
 	//printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refCurr,c_c.Kp,c_c.Ti,c_c.Td,c_c.sat,c_c.Kaw);
 	//printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refSpeed,s_c.Kp,s_c.Ti,s_c.Td,s_c.sat,s_c.Kaw);
 	//printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refPos,p_c.Kp,p_c.Ti,p_c.Td,p_c.sat,p_c.Kaw);
@@ -310,6 +347,8 @@ void measurTx()
 		  }
 
 		  m.endMeasurFlag = false;
+		  resetPID();
+		  resetData();
 	  }
 }
 
@@ -406,10 +445,6 @@ void controlMotor()
 		HAL_ADC_Start_DMA(&hadc2, &m.dmaMeasurCurr, 1);
 		break;
 	case STOP_MODE:
-		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,0);
-		changeDir(STOP_DIR);
-		HAL_ADC_Stop_DMA(&hadc2);
-		m.idx = 0;
 		break;
 	default:
 		break;
