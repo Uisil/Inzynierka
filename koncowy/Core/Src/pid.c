@@ -20,6 +20,7 @@ int16_t ringbuffer[100] = {0};
 uint32_t idx = 0;
 int32_t tmp = 0;
 int32_t diff = 0;
+uint16_t licz;
 
 
 
@@ -56,15 +57,15 @@ void initMotor()
 	c_c.Ti = 0.01;
 	c_c.Td = 0;
 	c_c.Kff = 0;
-	c_c.Kaw = 5;
+	c_c.Kaw = 1;
 	c_c.sat = 1;
 	c_c.pid_I_prev = 0;
 	c_c.u_prev = 0;
 	m.refCurr = 0.5;
 
 	//inicjalizacja parametrow regulatora PID predkości
-	s_c.Kp = 10;
-	s_c.Ti = 0.1;
+	s_c.Kp = 1;
+	s_c.Ti = 100000;
 	s_c.Td = 0;
 	s_c.Kff = 0;
 	s_c.Kaw = 0;
@@ -165,6 +166,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
 	if(hadc->Instance == ADC2)
 	{
+		HAL_TIM_Base_Start(&htim6);
 		m.measurCurr[m.idx] = -1*(0.00395522*m.dmaMeasurCurr-3.68421159);
 		speed_motor_calc();
 		if(mode == CURR_MODE)
@@ -183,6 +185,9 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 			regulator_PID_curr();
 		}
 		if(++m.idx >= 8000) m.idx = 8000;
+		HAL_TIM_Base_Stop(&htim6);
+		licz = __HAL_TIM_GET_COUNTER(&htim6);
+		__HAL_TIM_SET_COUNTER(&htim6,0);
 
 		//TxDataUART();
 		//motor.idx++;
@@ -489,8 +494,8 @@ void regulator_PID_speed()
 	float e = m.refSpeed - m.measurSpeed[m.idx];
 
 	float pid_P = s_c.Kp*e;
-	float pid_I = s_c.pid_I_prev + TsSpeed*(e*s_c.Kp-s_c.Kaw*(s_c.y-s_c.y_speed));
-	float pid_D = (e*s_c.Kp-s_c.u_prev)/TsSpeed;
+	float pid_I = s_c.pid_I_prev + Ts*(e*s_c.Kp-s_c.Kaw*(s_c.y-s_c.y_speed));
+	float pid_D = (e*s_c.Kp-s_c.u_prev)/Ts;
 
 	s_c.pid_I_prev = pid_I;
 	s_c.u_prev = pid_P;
