@@ -37,9 +37,9 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
 	if(huart == &huart2)
 	{
-		RxDecoding2();
+		RxDecoding3();
 		//printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refCurr,c_c.Kp,c_c.Ti,c_c.Td,c_c.sat,c_c.Kaw);
-		HAL_UARTEx_ReceiveToIdle_DMA(&huart2, m.tmpData, 1+21*2);
+		HAL_UARTEx_ReceiveToIdle_DMA(&huart2, m.tmpData, 21*4+1/*1+21*2*/);
 
 	}
 }
@@ -140,7 +140,7 @@ void speed_motor_calc()
 	diff = (enkoder_cnt - enkoder_cnt_old);
 	enkoder_tmp += diff;
 	enkoder_cnt_old = enkoder_cnt;
-	m.measurPos[m.idx] = (float)enkoder_cnt;//(float)enkoder_tmp/(resolution*enkoder_cyclic_cnt);
+	m.measurPos[m.idx] = (float)enkoder_tmp/(resolution*enkoder_cyclic_cnt);
 	/*if(diff>1500)
 	{
 		diff = -32768-tmp-(32768-enkoder_cnt);
@@ -166,8 +166,9 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
 	if(hadc->Instance == ADC2)
 	{
+		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);
 		HAL_TIM_Base_Start(&htim6);
-		m.measurCurr[m.idx] = -1*(0.00395522*m.dmaMeasurCurr-3.68421159);
+		m.measurCurr[m.idx] = -1*(0.00395522*m.dmaMeasurCurr-3.68421159-8.6);
 		speed_motor_calc();
 		if(mode == CURR_MODE)
 		{
@@ -297,9 +298,121 @@ void RxDecoding2()
 	// wyłączanie całkowania jeżeli użytkownik wprowadzi wartość 0
 	float tmpDecoding = c_c.Ti - 0;
 	if(tmpDecoding<0.00001) c_c.Ti = 100000000;
+	tmpDecoding = s_c.Ti - 0;
+	if(tmpDecoding<0.00001) s_c.Ti = 100000000;
+	tmpDecoding = p_c.Ti - 0;
+	if(tmpDecoding<0.00001) p_c.Ti = 100000000;
 	//printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refCurr,c_c.Kp,c_c.Ti,c_c.Td,c_c.sat,c_c.Kaw);
 	//printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refSpeed,s_c.Kp,s_c.Ti,s_c.Td,s_c.sat,s_c.Kaw);
 	//printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refPos,p_c.Kp,p_c.Ti,p_c.Td,p_c.sat,p_c.Kaw);
+}
+
+void RxDecoding3()
+{
+	uint8_t *ptr;
+	int parameterNo;
+
+	if(m.tmpData[0] == 0) mode = DEF_MODE;
+	else if(m.tmpData[0] == 1) mode = CURR_MODE;
+	else if(m.tmpData[0] == 2) mode = SPEED_MODE;
+	else if(m.tmpData[0] == 3) mode = POS_MODE;
+	else if(m.tmpData[0] == 4) mode = STOP_MODE;
+
+	//parametry regulatora prądu
+	parameterNo = 0;
+	ptr = (uint8_t *)&c_c.Kp;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+
+	parameterNo = 1;
+	ptr = (uint8_t *)&c_c.Ti;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+
+	parameterNo = 2;
+	ptr = (uint8_t *)&c_c.Td;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+
+	parameterNo = 3;
+	ptr = (uint8_t *)&c_c.Kff;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+
+	parameterNo = 4;
+	ptr = (uint8_t *)&c_c.Kaw;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+
+	/*parameterNo = 5;
+	ptr = (uint8_t *)&c_c.Ts;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[ParameterNo*sizeof(float)+i];*/
+
+	parameterNo = 6;
+	ptr = (uint8_t *)&m.refCurr;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+
+	//parametry regulatora prędkości
+	parameterNo = 7;
+	ptr = (uint8_t *)&s_c.Kp;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+
+	parameterNo = 8;
+	ptr = (uint8_t *)&s_c.Ti;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+
+	parameterNo = 9;
+	ptr = (uint8_t *)&s_c.Td;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+
+	parameterNo = 10;
+	ptr = (uint8_t *)&s_c.Kff;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+
+	parameterNo = 11;
+	ptr = (uint8_t *)&s_c.Kaw;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+
+	/*parameterNo = 12;
+	ptr = (uint8_t *)&c_c.Ts;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[ParameterNo*sizeof(float)+i];*/
+
+	parameterNo = 13;
+	ptr = (uint8_t *)&m.refSpeed;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+
+	//parametry regulatora położenia
+	parameterNo = 14;
+	ptr = (uint8_t *)&p_c.Kp;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+
+	parameterNo = 15;
+	ptr = (uint8_t *)&p_c.Ti;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+
+	parameterNo = 16;
+	ptr = (uint8_t *)&p_c.Td;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+
+	parameterNo = 17;
+	ptr = (uint8_t *)&p_c.Kff;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+
+	parameterNo = 18;
+	ptr = (uint8_t *)&p_c.Kaw;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+
+	/*parameterNo = 19;
+	ptr = (uint8_t *)&p_c.Ts;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[ParameterNo*sizeof(float)+i];*/
+
+	parameterNo = 20;
+	ptr = (uint8_t *)&m.refPos;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+
+	// wyłączanie całkowania jeżeli użytkownik wprowadzi wartość 0
+	float tmpDecoding = c_c.Ti - 0;
+	if(tmpDecoding<0.00001) c_c.Ti = 100000000;
+	tmpDecoding = s_c.Ti - 0;
+	if(tmpDecoding<0.00001) s_c.Ti = 100000000;
+	tmpDecoding = p_c.Ti - 0;
+	if(tmpDecoding<0.00001) p_c.Ti = 100000000;
+
 }
 
 void testowa()
@@ -450,6 +563,7 @@ void controlMotor()
 		HAL_ADC_Start_DMA(&hadc2, &m.dmaMeasurCurr, 1);
 		break;
 	case STOP_MODE:
+		__HAL_TIM_SET_COUNTER(&htim1,0);
 		break;
 	default:
 		break;
@@ -476,14 +590,14 @@ void regulator_PID_curr()
 
 	if(c_c.y_curr>=0)
 	{
-		changeDir(LEFT_DIR);
+		changeDir(RIGHT_DIR);
 		new_pwm = (uint16_t)(6000*c_c.y_curr);
 		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,new_pwm);
 	}
 	else
 	{
-		changeDir(RIGHT_DIR);
-		new_pwm = (uint16_t)(-6000*c_c.y_curr);
+		changeDir(LEFT_DIR);
+		new_pwm = (uint16_t)(6000*c_c.y_curr);
 		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1, new_pwm);
 	}
 }

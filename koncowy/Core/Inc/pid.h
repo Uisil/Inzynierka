@@ -59,7 +59,7 @@ typedef struct
 	float measurPos[8000];
 
 	uint8_t tmpRx;
-	uint8_t tmpData[1+21*2/*7*6+1*/];
+	uint8_t tmpData[21*4+1/*1+21*2*/];
 	uint8_t stateRx;
 }motor;
 
@@ -114,6 +114,7 @@ void TxDataUART();
 void measurTx();
 void RxDecoding();
 void RxDecoding2();
+void RxDecoding3();
 void testowa();
 void controlMotor();
 void defaultMotorMove();
