@@ -549,17 +549,17 @@ void controlMotor()
 		defaultMotorMove();
 		break;
 	case CURR_MODE:
-		HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, valueLoad*4096/100);
+		HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoad);
 		HAL_ADC_Start_DMA(&hadc2, &m.dmaMeasurCurr, 1);
 		controlMotorMove();
 		break;
 	case SPEED_MODE:
-		HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, valueLoad*4096/100);
+		HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoad);
 		HAL_ADC_Start_DMA(&hadc2, &m.dmaMeasurCurr, 1);
 		controlMotorMove();
 		break;
 	case POS_MODE:
-		HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, valueLoad*4096/100);
+		HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoad);
 		HAL_ADC_Start_DMA(&hadc2, &m.dmaMeasurCurr, 1);
 		controlMotorMove();
 		break;
