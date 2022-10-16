@@ -10,6 +10,7 @@
 
 #include "main.h"
 #include "adc.h"
+#include "dac.h"
 #include "dma.h"
 #include "tim.h"
 #include "usart.h"
@@ -49,6 +50,7 @@ typedef struct
 	float refCurr;
 	float refSpeed;
 	float refPos;
+	uint16_t valueLoad;
 
 	uint16_t idx;
 	bool endMeasurFlag;
@@ -57,9 +59,10 @@ typedef struct
 	float measurCurr[8000];
 	float measurSpeed[8000];
 	float measurPos[8000];
+	float simTime;
 
 	uint8_t tmpRx;
-	uint8_t tmpData[21*4+1/*1+21*2*/];
+	uint8_t tmpData[2+19*4/*21*4+1*/];
 	uint8_t stateRx;
 }motor;
 

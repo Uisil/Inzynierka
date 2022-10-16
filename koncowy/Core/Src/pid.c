@@ -30,7 +30,8 @@ void initPeripherals()
 	__HAL_TIM_SET_COUNTER(&htim1,0);
 	  HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_1);
 	  //HAL_UART_Receive_DMA(&huart2, m.tmpData, 1+7*2/*7*6+1*/);
-	  HAL_UARTEx_ReceiveToIdle_DMA(&huart2, m.tmpData, 1+21*2);
+	  HAL_UARTEx_ReceiveToIdle_DMA(&huart2, m.tmpData, 2+19*4);
+	  HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
 }
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
@@ -39,7 +40,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 	{
 		RxDecoding3();
 		//printf("tryb:%d ref:%f Kp:%f Ti:%f Td:%f sat:%f Kw:%f\n",mode,m.refCurr,c_c.Kp,c_c.Ti,c_c.Td,c_c.sat,c_c.Kaw);
-		HAL_UARTEx_ReceiveToIdle_DMA(&huart2, m.tmpData, 21*4+1/*1+21*2*/);
+		HAL_UARTEx_ReceiveToIdle_DMA(&huart2, m.tmpData, 2+19*4/*21*4+1*/);
 
 	}
 }
@@ -309,6 +310,10 @@ void RxDecoding2()
 
 void RxDecoding3()
 {
+	/*budowa ramki danych: mode, m.valueLoad, m.simTime,c_c.Kp, c_c.Ti, c_c.Td, c_c.Kff, c_c.Kaw, m.refCurr
+	 * s_c.Kp, s_c.Ti, s_c.Td, s_c.Kff, s_c.Kaw, m.refSpeed
+	 * p_c.Kp, p_c.Ti, p_c.Td, p_c.Kff, p_c.Kaw, m.refPos
+	 * */
 	uint8_t *ptr;
 	int parameterNo;
 
@@ -318,92 +323,88 @@ void RxDecoding3()
 	else if(m.tmpData[0] == 3) mode = POS_MODE;
 	else if(m.tmpData[0] == 4) mode = STOP_MODE;
 
-	//parametry regulatora prądu
-	parameterNo = 0;
-	ptr = (uint8_t *)&c_c.Kp;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	m.valueLoad = m.tmpData[1]*4096/100;
 
+	parameterNo = 0;
+	ptr = (uint8_t *)&m.simTime;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[2+parameterNo*sizeof(float)+i];
+
+	//parametry regulatora prądu
 	parameterNo = 1;
-	ptr = (uint8_t *)&c_c.Ti;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	ptr = (uint8_t *)&c_c.Kp;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[2+parameterNo*sizeof(float)+i];
 
 	parameterNo = 2;
-	ptr = (uint8_t *)&c_c.Td;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	ptr = (uint8_t *)&c_c.Ti;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[2+parameterNo*sizeof(float)+i];
 
 	parameterNo = 3;
-	ptr = (uint8_t *)&c_c.Kff;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	ptr = (uint8_t *)&c_c.Td;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[2+parameterNo*sizeof(float)+i];
 
 	parameterNo = 4;
-	ptr = (uint8_t *)&c_c.Kaw;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	ptr = (uint8_t *)&c_c.Kff;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[2+parameterNo*sizeof(float)+i];
 
-	/*parameterNo = 5;
-	ptr = (uint8_t *)&c_c.Ts;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[ParameterNo*sizeof(float)+i];*/
+	parameterNo = 5;
+	ptr = (uint8_t *)&c_c.Kaw;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[2+parameterNo*sizeof(float)+i];
 
 	parameterNo = 6;
 	ptr = (uint8_t *)&m.refCurr;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[2+parameterNo*sizeof(float)+i];
+
 
 	//parametry regulatora prędkości
 	parameterNo = 7;
 	ptr = (uint8_t *)&s_c.Kp;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[2+parameterNo*sizeof(float)+i];
 
 	parameterNo = 8;
 	ptr = (uint8_t *)&s_c.Ti;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[2+parameterNo*sizeof(float)+i];
 
 	parameterNo = 9;
 	ptr = (uint8_t *)&s_c.Td;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[2+parameterNo*sizeof(float)+i];
 
 	parameterNo = 10;
 	ptr = (uint8_t *)&s_c.Kff;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[2+parameterNo*sizeof(float)+i];
 
 	parameterNo = 11;
 	ptr = (uint8_t *)&s_c.Kaw;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[2+parameterNo*sizeof(float)+i];
 
-	/*parameterNo = 12;
-	ptr = (uint8_t *)&c_c.Ts;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[ParameterNo*sizeof(float)+i];*/
-
-	parameterNo = 13;
+	parameterNo = 12;
 	ptr = (uint8_t *)&m.refSpeed;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[2+parameterNo*sizeof(float)+i];
+
 
 	//parametry regulatora położenia
-	parameterNo = 14;
+	parameterNo = 13;
 	ptr = (uint8_t *)&p_c.Kp;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[2+parameterNo*sizeof(float)+i];
+
+	parameterNo = 14;
+	ptr = (uint8_t *)&p_c.Ti;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[2+parameterNo*sizeof(float)+i];
 
 	parameterNo = 15;
-	ptr = (uint8_t *)&p_c.Ti;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	ptr = (uint8_t *)&p_c.Td;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[2+parameterNo*sizeof(float)+i];
 
 	parameterNo = 16;
-	ptr = (uint8_t *)&p_c.Td;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	ptr = (uint8_t *)&p_c.Kff;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[2+parameterNo*sizeof(float)+i];
 
 	parameterNo = 17;
-	ptr = (uint8_t *)&p_c.Kff;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	ptr = (uint8_t *)&p_c.Kaw;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[2+parameterNo*sizeof(float)+i];
 
 	parameterNo = 18;
-	ptr = (uint8_t *)&p_c.Kaw;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
-
-	/*parameterNo = 19;
-	ptr = (uint8_t *)&p_c.Ts;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[ParameterNo*sizeof(float)+i];*/
-
-	parameterNo = 20;
 	ptr = (uint8_t *)&m.refPos;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[2+parameterNo*sizeof(float)+i];
 
 	// wyłączanie całkowania jeżeli użytkownik wprowadzi wartość 0
 	float tmpDecoding = c_c.Ti - 0;
@@ -548,14 +549,17 @@ void controlMotor()
 		defaultMotorMove();
 		break;
 	case CURR_MODE:
+		HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, valueLoad*4096/100);
 		HAL_ADC_Start_DMA(&hadc2, &m.dmaMeasurCurr, 1);
 		controlMotorMove();
 		break;
 	case SPEED_MODE:
+		HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, valueLoad*4096/100);
 		HAL_ADC_Start_DMA(&hadc2, &m.dmaMeasurCurr, 1);
 		controlMotorMove();
 		break;
 	case POS_MODE:
+		HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, valueLoad*4096/100);
 		HAL_ADC_Start_DMA(&hadc2, &m.dmaMeasurCurr, 1);
 		controlMotorMove();
 		break;
