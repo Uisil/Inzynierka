@@ -27,6 +27,7 @@
 #define INA_PIN GPIO_PIN_11
 #define INB_PIN GPIO_PIN_7
 #define DIR_PORT GPIOA
+#define FRAME_RECIVE_WIDITH 6+30*4
 typedef enum
 {
 	DEF_MODE,
@@ -47,23 +48,29 @@ typedef enum
 typedef struct
 {
 	//wartości zadane w unii?
-	float refCurr;
-	float refSpeed;
-	float refPos;
+	volatile float refCurr;
+	volatile float refSpeed;
+	volatile float refPos;
 	uint16_t valueLoad;
 
 	uint16_t idx;
 	bool endMeasurFlag;
 	bool moveInProgress;
 	uint32_t dmaMeasurCurr;
-	float measurCurr[8000];
-	float measurSpeed[8000];
-	float measurPos[8000];
-	float simTime;
+	volatile float measurCurr[8000];
+	volatile float measurSpeed[8000];
+	volatile float measurPos[8000];
+	volatile float simTime;
+	volatile float time;
 
 	uint8_t tmpRx;
-	uint8_t tmpData[2+19*4/*21*4+1*/];
+	uint8_t tmpData[FRAME_RECIVE_WIDITH];
 	uint8_t stateRx;
+
+	float timeValuePattern[5];
+	float refValuePattern[5];
+	float timeLoadPattern[5];
+	uint16_t valueLoadPattern[5];
 }motor;
 
 typedef struct
@@ -111,24 +118,52 @@ typedef struct
 	float u_prev;
 }positionControler;
 
+typedef struct
+{
+	int32_t enkoder_tmp;
+	int32_t enkoder_cnt;
+	int16_t enkoder_cnt_old;
+	int16_t ringbuffer[100];
+	uint32_t idx;
+	int32_t tmp;
+	int32_t diff;
+}measureSpeed;
+
 void initPeripherals();
 void initMotor();
-void TxDataUART();
-void measurTx();
-void RxDecoding();
-void RxDecoding2();
-void RxDecoding3();
-void testowa();
+
+void transmitData();
+
+void reciveData();
+void reciveRefPattern();
+void reciveLoadPattern();
+void reciveMotorParameters();
+void reciveCurrPIDParameters();
+void reciveSpeedPIDParameters();
+void recivePosPIDParameters();
+
+void setRefValue(float *refValue);
+void setMotorLoad();
+
+void controlMotor2();
 void controlMotor();
 void defaultMotorMove();
 void controlMotorMove();
 void changeDir(Direction dir);
+
 void regulator_PID_curr();
 void regulator_PID_speed();
 void regulator_PID_pos();
-void speed_motor_calc();
+
+void enkoderMeasure();;
+void speedCalc();
+void posCalc();
+
 void resetPID();
 void resetData();
 
-
+void initControler();
+void initCurrPID();
+void initSpeedPID();
+void initPosPID();
 #endif /* INC_PID_H_ */

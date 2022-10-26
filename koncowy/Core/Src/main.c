@@ -114,8 +114,8 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  //testowa();
-	  controlMotor();
-	  measurTx();
+	  //controlMotor();
+	  transmitData();
   }
   /* USER CODE END 3 */
 }
