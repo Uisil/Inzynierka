@@ -24,6 +24,7 @@ void initPeripherals()
 	HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_1);
 	HAL_UARTEx_ReceiveToIdle_DMA(&huart2, m.tmpData, FRAME_RECIVE_WIDITH);
 	HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
+	HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 4000);// 610 TO WARTOŚĆ 0.140 V
 	HAL_ADC_Start_DMA(&hadc2, &m.dmaMeasurCurr, 1);
 }
 
