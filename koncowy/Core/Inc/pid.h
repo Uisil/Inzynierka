@@ -78,7 +78,7 @@ typedef struct
 	float Kp;
 	float Ti;
 	float Td;
-	float Kff;
+	float KffLoad; // wyjątkowo odczytywany w funkcji od regulatora pozycji
 	float sat;
 	float Kaw;
 
@@ -93,7 +93,6 @@ typedef struct
 	float Kp;
 	float Ti;
 	float Td;
-	float Kff;
 	float sat;
 	float Kaw;
 

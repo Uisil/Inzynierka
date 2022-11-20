@@ -59,7 +59,7 @@ void initCurrPID()
 	c_c.Kp = 0.8;
 	c_c.Ti = 0.01;
 	c_c.Td = 0;
-	c_c.Kff = 0;
+	c_c.KffLoad = 0;
 	c_c.Kaw = 1;
 	c_c.sat = 1;
 	c_c.pid_I_prev = 0;
@@ -72,7 +72,6 @@ void initSpeedPID()
 	s_c.Kp = 1;
 	s_c.Ti = 100000;
 	s_c.Td = 0;
-	s_c.Kff = 0;
 	s_c.Kaw = 0;
 	s_c.sat = 3.3;
 	s_c.pid_I_prev = 0;
@@ -445,10 +444,6 @@ void reciveCurrPIDParameters()
 	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[6+parameterNo*sizeof(float)+i];
 
 	parameterNo = 19;
-	ptr = (uint8_t *)&c_c.Kff;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[6+parameterNo*sizeof(float)+i];
-
-	parameterNo = 20;
 	ptr = (uint8_t *)&c_c.Kaw;
 	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[6+parameterNo*sizeof(float)+i];
 }
@@ -458,23 +453,19 @@ void reciveSpeedPIDParameters()
 	uint8_t *ptr;
 	int parameterNo;
 
-	parameterNo = 21;
+	parameterNo = 20;
 	ptr = (uint8_t *)&s_c.Kp;
 	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[6+parameterNo*sizeof(float)+i];
 
-	parameterNo = 22;
+	parameterNo = 21;
 	ptr = (uint8_t *)&s_c.Ti;
 	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[6+parameterNo*sizeof(float)+i];
 
-	parameterNo = 23;
+	parameterNo = 22;
 	ptr = (uint8_t *)&s_c.Td;
 	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[6+parameterNo*sizeof(float)+i];
 
-	parameterNo = 24;
-	ptr = (uint8_t *)&s_c.Kff;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[6+parameterNo*sizeof(float)+i];
-
-	parameterNo = 25;
+	parameterNo = 23;
 	ptr = (uint8_t *)&s_c.Kaw;
 	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[6+parameterNo*sizeof(float)+i];
 }
@@ -484,23 +475,27 @@ void recivePosPIDParameters()
 	uint8_t *ptr;
 	int parameterNo;
 
-	parameterNo = 26;
+	parameterNo = 24;
 	ptr = (uint8_t *)&p_c.Kp;
 	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[6+parameterNo*sizeof(float)+i];
 
-	parameterNo = 27;
+	parameterNo = 25;
 	ptr = (uint8_t *)&p_c.Ti;
 	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[6+parameterNo*sizeof(float)+i];
 
-	parameterNo = 28;
+	parameterNo = 26;
 	ptr = (uint8_t *)&p_c.Td;
 	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[6+parameterNo*sizeof(float)+i];
 
-	parameterNo = 29;
+	parameterNo = 27;
 	ptr = (uint8_t *)&p_c.Kff;
 	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[6+parameterNo*sizeof(float)+i];
 
-	parameterNo = 30;
+	parameterNo = 28;
+	ptr = (uint8_t *)&c_c.KffLoad;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[6+parameterNo*sizeof(float)+i];
+
+	parameterNo = 29;
 	ptr = (uint8_t *)&p_c.Kaw;
 	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[6+parameterNo*sizeof(float)+i];
 }
