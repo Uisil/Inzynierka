@@ -669,7 +669,7 @@ void regulator_PID_curr()
 	else
 	{
 		changeDir(LEFT_DIR);
-		new_pwm = (uint16_t)(6000*c_c.y_curr);
+		new_pwm = (uint16_t)(6000*(-1*c_c.y_curr));
 		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1, new_pwm);
 	}
 }
