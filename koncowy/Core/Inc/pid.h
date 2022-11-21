@@ -128,8 +128,17 @@ typedef struct
 	int32_t diff;
 }measureSpeed;
 
+typedef struct
+{
+	float Jm;
+	float kt;
+	float prev_u;
+	float Mob;
+}observer;
+
 void initPeripherals();
 void initMotor();
+void initObserver();
 
 void transmitData();
 
@@ -153,6 +162,8 @@ void changeDir(Direction dir);
 void regulator_PID_curr();
 void regulator_PID_speed();
 void regulator_PID_pos();
+
+void loadTorqueObserver();
 
 void enkoderMeasure();;
 void speedCalc();

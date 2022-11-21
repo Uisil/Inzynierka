@@ -14,6 +14,7 @@ currentControler c_c;
 speedControler s_c;
 positionControler p_c;
 measureSpeed mSpeed;
+observer lto;
 
 
 
@@ -45,18 +46,27 @@ void initMotor()
 	initCurrPID();
 	initSpeedPID();
 	initPosPID();
+	initObserver();
+}
+
+void initObserver()
+{
+	lto.Jm = 0.000025; // [kg/m^2]
+	lto.kt = 0.058;
+	lto.Mob = 0;
+	lto.prev_u = 0;
 }
 
 void initControler()
 {
-	mode = DEF_MODE;
+	mode = STOP_MODE;
 	m.endMeasurFlag = false;
 	m.moveInProgress = false;
 }
 
 void initCurrPID()
 {
-	c_c.Kp = 0.8;
+	c_c.Kp = 1.2;
 	c_c.Ti = 0.01;
 	c_c.Td = 0;
 	c_c.KffLoad = 0;
@@ -69,10 +79,10 @@ void initCurrPID()
 
 void initSpeedPID()
 {
-	s_c.Kp = 1;
-	s_c.Ti = 100000;
+	s_c.Kp = 0.008;
+	s_c.Ti = 1;
 	s_c.Td = 0;
-	s_c.Kaw = 0;
+	s_c.Kaw = 1;
 	s_c.sat = 3.3;
 	s_c.pid_I_prev = 0;
 	s_c.u_prev = 0;
@@ -81,7 +91,7 @@ void initSpeedPID()
 
 void initPosPID()
 {
-	p_c.Kp = 10;
+	p_c.Kp = 900;
 	p_c.Ti = 10000000000;
 	p_c.Td = 0;
 	p_c.Kff = 0;
@@ -278,7 +288,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 				mode = STOP_MODE;
 				m.endMeasurFlag = true;
 			}
-
+			loadTorqueObserver();
 			regulator_PID_pos();
 			regulator_PID_speed();
 			regulator_PID_curr();
@@ -651,6 +661,8 @@ void regulator_PID_curr()
 
 	c_c.y = pid_P + pid_I/c_c.Ti + pid_D*c_c.Td;
 
+	c_c.y += c_c.KffLoad*lto.Mob; // moment obciążenia
+
 	if(c_c.y > c_c.sat) c_c.y_curr = c_c.sat;
 	else if(c_c.y < -c_c.sat) c_c.y_curr = -c_c.sat;
 	else c_c.y_curr = c_c.y;
@@ -704,9 +716,21 @@ void regulator_PID_pos()
 
 	p_c.y = pid_P + pid_I/p_c.Ti + pid_D*p_c.Td;
 
+	p_c.y += p_c.Kff*m.refPos;
+
 	if(p_c.y > p_c.sat) p_c.y_pos = p_c.sat;
 	else if(p_c.y < -p_c.sat) p_c.y_pos = -p_c.sat;
 	else p_c.y_pos = p_c.y;
 
 	m.refSpeed = p_c.y_pos;
+}
+
+void loadTorqueObserver()
+{
+	float uSpeed = lto.Jm*m.measurSpeed[m.idx];
+	float speedElement = (uSpeed - lto.prev_u)/Ts;
+	float currentElement = lto.kt*m.measurCurr[m.idx];
+
+	lto.prev_u = uSpeed;
+	lto.Mob = currentElement - speedElement;
 }
