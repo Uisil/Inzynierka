@@ -62,6 +62,7 @@ void initControler()
 	mode = STOP_MODE;
 	m.endMeasurFlag = false;
 	m.moveInProgress = false;
+	m.sampleDiv = 7;
 }
 
 void initCurrPID()
@@ -162,7 +163,7 @@ void posCalc()
 	mSpeed.diff = (mSpeed.enkoder_cnt - mSpeed.enkoder_cnt_old);
 	mSpeed.enkoder_tmp += mSpeed.diff;
 	mSpeed.enkoder_cnt_old = mSpeed.enkoder_cnt;
-	m.measurPos[m.idx] = (float)mSpeed.enkoder_tmp/(resolution*enkoder_cyclic_cnt);
+	m.actualPos = (float)mSpeed.enkoder_tmp/(resolution*enkoder_cyclic_cnt);
 }
 
 void speedCalc()
@@ -173,7 +174,7 @@ void speedCalc()
 	mSpeed.ringbuffer[mSpeed.idx] = mSpeed.enkoder_cnt;
 
 	mSpeed.diff = (mSpeed.enkoder_cnt - mSpeed.tmp);
-	m.measurSpeed[m.idx] = (60*(float)mSpeed.diff*enkoder_freq/100)/(resolution*enkoder_cyclic_cnt);
+	m.actualSpeed = (60*(float)mSpeed.diff*enkoder_freq/100)/(resolution*enkoder_cyclic_cnt);
 }
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
@@ -182,118 +183,118 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 	{
 		if(mode!=STOP_MODE)
 		{
-		m.time=Ts*m.idx;
+			m.time=Ts*m.idx;
 
-		// pomiar prądu i odczyt wartości z enkodera
-		m.measurCurr[m.idx] = -1*(0.00395522*m.dmaMeasurCurr-3.68421159-8.6);
-		enkoderMeasure();
-		if(mode == DEF_MODE)
-		{
-			if(m.time<0.200)
+			// pomiar prądu i odczyt wartości z enkodera
+			m.actualCurr = -1*(0.00395522*m.dmaMeasurCurr-3.68421159-8.6);
+			enkoderMeasure();
+			if(mode == DEF_MODE)
 			{
-				changeDir(LEFT_DIR);
-				__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,1500);
+				if(m.time<0.200)
+				{
+					changeDir(LEFT_DIR);
+					__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,1500);
+				}
+				else if(m.time<0.400 && m.time>=0.200)
+				{
+					changeDir(RIGHT_DIR);
+					__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,1500);
+				}
+				else
+				{
+					changeDir(STOP_DIR);
+					mode = STOP_MODE;
+					m.endMeasurFlag = true;
+				}
+				if(++m.idx >= 8000) m.idx = 8000;
 			}
-			else if(m.time<0.400 && m.time>=0.200)
+			if(mode == CURR_MODE)
 			{
-				changeDir(RIGHT_DIR);
-				__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,1500);
-			}
-			else
-			{
-				changeDir(STOP_DIR);
-				mode = STOP_MODE;
-				m.endMeasurFlag = true;
-			}
-			if(++m.idx >= 8000) m.idx = 8000;
-		}
-		if(mode == CURR_MODE)
-		{
-			if(m.time>=m.timeLoadPattern[0]/1000&&m.time<m.timeLoadPattern[1]/1000)
-				HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[0]);
-			if(m.time>=m.timeLoadPattern[1]/1000&&m.time<m.timeLoadPattern[2]/1000)
-				HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[1]);
-			if(m.time>=m.timeLoadPattern[2]/1000&&m.time<m.timeLoadPattern[3]/1000)
-				HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[2]);
-			if(m.time>=m.timeLoadPattern[3]/1000&&m.time<m.timeLoadPattern[4]/1000)
-				HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[3]);
-			if(m.time>=m.timeLoadPattern[4]/1000&&m.time<m.simTime/1000)
-				HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[4]);
+				if(m.time>=m.timeLoadPattern[0]/1000&&m.time<m.timeLoadPattern[1]/1000)
+					HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[0]);
+				if(m.time>=m.timeLoadPattern[1]/1000&&m.time<m.timeLoadPattern[2]/1000)
+					HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[1]);
+				if(m.time>=m.timeLoadPattern[2]/1000&&m.time<m.timeLoadPattern[3]/1000)
+					HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[2]);
+				if(m.time>=m.timeLoadPattern[3]/1000&&m.time<m.timeLoadPattern[4]/1000)
+					HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[3]);
+				if(m.time>=m.timeLoadPattern[4]/1000&&m.time<m.simTime/1000)
+					HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[4]);
 
-			if(m.time>=m.timeValuePattern[0]/1000&&m.time<m.timeValuePattern[1]/1000) m.refCurr=m.refValuePattern[0];
-			if(m.time>=m.timeValuePattern[1]/1000&&m.time<m.timeValuePattern[2]/1000) m.refCurr=m.refValuePattern[1];
-			if(m.time>=m.timeValuePattern[2]/1000&&m.time<m.timeValuePattern[3]/1000) m.refCurr=m.refValuePattern[2];
-			if(m.time>=m.timeValuePattern[3]/1000&&m.time<=m.timeValuePattern[4]/1000) m.refCurr=m.refValuePattern[3];
-			if(m.time>=m.timeValuePattern[4]/1000&&m.time<m.simTime/1000) m.refCurr=m.refValuePattern[4];
-			if(m.time>=m.simTime/1000)
-			{
-				changeDir(STOP_DIR);
-				mode = STOP_MODE;
-				m.endMeasurFlag = true;
+				if(m.time>=m.timeValuePattern[0]/1000&&m.time<m.timeValuePattern[1]/1000) m.refCurr=m.refValuePattern[0];
+				if(m.time>=m.timeValuePattern[1]/1000&&m.time<m.timeValuePattern[2]/1000) m.refCurr=m.refValuePattern[1];
+				if(m.time>=m.timeValuePattern[2]/1000&&m.time<m.timeValuePattern[3]/1000) m.refCurr=m.refValuePattern[2];
+				if(m.time>=m.timeValuePattern[3]/1000&&m.time<=m.timeValuePattern[4]/1000) m.refCurr=m.refValuePattern[3];
+				if(m.time>=m.timeValuePattern[4]/1000&&m.time<m.simTime/1000) m.refCurr=m.refValuePattern[4];
+				if(m.time>=m.simTime/1000)
+				{
+					changeDir(STOP_DIR);
+					mode = STOP_MODE;
+					m.endMeasurFlag = true;
+				}
+
+				regulator_PID_curr();
+				if(++m.idx >= 8000) m.idx = 8000;
 			}
-
-			regulator_PID_curr();
-			if(++m.idx >= 8000) m.idx = 8000;
-		}
-		if(mode == SPEED_MODE)
-		{
-			if(m.time>=m.timeLoadPattern[0]/1000&&m.time<m.timeLoadPattern[1]/1000)
-				HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[0]);
-			if(m.time>=m.timeLoadPattern[1]/1000&&m.time<m.timeLoadPattern[2]/1000)
-				HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[1]);
-			if(m.time>=m.timeLoadPattern[2]/1000&&m.time<m.timeLoadPattern[3]/1000)
-				HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[2]);
-			if(m.time>=m.timeLoadPattern[3]/1000&&m.time<m.timeLoadPattern[4]/1000)
-				HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[3]);
-			if(m.time>=m.timeLoadPattern[4]/1000&&m.time<m.simTime/1000)
-				HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[4]);
-
-			if(m.time>=m.timeValuePattern[0]/1000&&m.time<m.timeValuePattern[1]/1000) m.refSpeed=m.refValuePattern[0];
-			if(m.time>=m.timeValuePattern[1]/1000&&m.time<m.timeValuePattern[2]/1000) m.refSpeed=m.refValuePattern[1];
-			if(m.time>=m.timeValuePattern[2]/1000&&m.time<m.timeValuePattern[3]/1000) m.refSpeed=m.refValuePattern[2];
-			if(m.time>=m.timeValuePattern[3]/1000&&m.time<m.timeValuePattern[4]/1000) m.refSpeed=m.refValuePattern[3];
-			if(m.time>=m.timeValuePattern[4]/1000&&m.time<m.simTime/1000) m.refSpeed=m.refValuePattern[4];
-			if(m.time>=m.simTime/1000)
+			if(mode == SPEED_MODE)
 			{
-				changeDir(STOP_DIR);
-				mode = STOP_MODE;
-				m.endMeasurFlag = true;
+				if(m.time>=m.timeLoadPattern[0]/1000&&m.time<m.timeLoadPattern[1]/1000)
+					HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[0]);
+				if(m.time>=m.timeLoadPattern[1]/1000&&m.time<m.timeLoadPattern[2]/1000)
+					HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[1]);
+				if(m.time>=m.timeLoadPattern[2]/1000&&m.time<m.timeLoadPattern[3]/1000)
+					HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[2]);
+				if(m.time>=m.timeLoadPattern[3]/1000&&m.time<m.timeLoadPattern[4]/1000)
+					HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[3]);
+				if(m.time>=m.timeLoadPattern[4]/1000&&m.time<m.simTime/1000)
+					HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[4]);
+
+				if(m.time>=m.timeValuePattern[0]/1000&&m.time<m.timeValuePattern[1]/1000) m.refSpeed=m.refValuePattern[0];
+				if(m.time>=m.timeValuePattern[1]/1000&&m.time<m.timeValuePattern[2]/1000) m.refSpeed=m.refValuePattern[1];
+				if(m.time>=m.timeValuePattern[2]/1000&&m.time<m.timeValuePattern[3]/1000) m.refSpeed=m.refValuePattern[2];
+				if(m.time>=m.timeValuePattern[3]/1000&&m.time<m.timeValuePattern[4]/1000) m.refSpeed=m.refValuePattern[3];
+				if(m.time>=m.timeValuePattern[4]/1000&&m.time<m.simTime/1000) m.refSpeed=m.refValuePattern[4];
+				if(m.time>=m.simTime/1000)
+				{
+					changeDir(STOP_DIR);
+					mode = STOP_MODE;
+					m.endMeasurFlag = true;
+				}
+
+				regulator_PID_speed();
+				regulator_PID_curr();
+				if(++m.idx >= 8000) m.idx = 8000;
 			}
-
-			regulator_PID_speed();
-			regulator_PID_curr();
-			if(++m.idx >= 8000) m.idx = 8000;
-		}
-		if(mode == POS_MODE)
-		{
-			if(m.time>=m.timeLoadPattern[0]/1000&&m.time<m.timeLoadPattern[1]/1000)
-				HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[0]);
-			if(m.time>=m.timeLoadPattern[1]/1000&&m.time<m.timeLoadPattern[2]/1000)
-				HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[1]);
-			if(m.time>=m.timeLoadPattern[2]/1000&&m.time<m.timeLoadPattern[3]/1000)
-				HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[2]);
-			if(m.time>=m.timeLoadPattern[3]/1000&&m.time<m.timeLoadPattern[4]/1000)
-				HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[3]);
-			if(m.time>=m.timeLoadPattern[4]/1000&&m.time<m.simTime/1000)
-				HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[4]);
-
-			if(m.time>=m.timeValuePattern[0]/1000&&m.time<m.timeValuePattern[1]/1000) m.refPos=m.refValuePattern[0];
-			if(m.time>=m.timeValuePattern[1]/1000&&m.time<m.timeValuePattern[2]/1000) m.refPos=m.refValuePattern[1];
-			if(m.time>=m.timeValuePattern[2]/1000&&m.time<m.timeValuePattern[3]/1000) m.refPos=m.refValuePattern[2];
-			if(m.time>=m.timeValuePattern[3]/1000&&m.time<m.timeValuePattern[4]/1000) m.refPos=m.refValuePattern[3];
-			if(m.time>=m.timeValuePattern[4]/1000&&m.time<m.simTime/1000) m.refPos=m.refValuePattern[4];
-			if(m.time>=m.simTime/1000)
+			if(mode == POS_MODE)
 			{
-				changeDir(STOP_DIR);
-				mode = STOP_MODE;
-				m.endMeasurFlag = true;
+				if(m.time>=m.timeLoadPattern[0]/1000&&m.time<m.timeLoadPattern[1]/1000)
+					HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[0]);
+				if(m.time>=m.timeLoadPattern[1]/1000&&m.time<m.timeLoadPattern[2]/1000)
+					HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[1]);
+				if(m.time>=m.timeLoadPattern[2]/1000&&m.time<m.timeLoadPattern[3]/1000)
+					HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[2]);
+				if(m.time>=m.timeLoadPattern[3]/1000&&m.time<m.timeLoadPattern[4]/1000)
+					HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[3]);
+				if(m.time>=m.timeLoadPattern[4]/1000&&m.time<m.simTime/1000)
+					HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, m.valueLoadPattern[4]);
+
+				if(m.time>=m.timeValuePattern[0]/1000&&m.time<m.timeValuePattern[1]/1000) m.refPos=m.refValuePattern[0];
+				if(m.time>=m.timeValuePattern[1]/1000&&m.time<m.timeValuePattern[2]/1000) m.refPos=m.refValuePattern[1];
+				if(m.time>=m.timeValuePattern[2]/1000&&m.time<m.timeValuePattern[3]/1000) m.refPos=m.refValuePattern[2];
+				if(m.time>=m.timeValuePattern[3]/1000&&m.time<m.timeValuePattern[4]/1000) m.refPos=m.refValuePattern[3];
+				if(m.time>=m.timeValuePattern[4]/1000&&m.time<m.simTime/1000) m.refPos=m.refValuePattern[4];
+				if(m.time>=m.simTime/1000)
+				{
+					changeDir(STOP_DIR);
+					mode = STOP_MODE;
+					m.endMeasurFlag = true;
+				}
+				loadTorqueObserver();
+				regulator_PID_pos();
+				regulator_PID_speed();
+				regulator_PID_curr();
+				if(++m.idx >= 8000) m.idx = 8000;
 			}
-			loadTorqueObserver();
-			regulator_PID_pos();
-			regulator_PID_speed();
-			regulator_PID_curr();
-			if(++m.idx >= 8000) m.idx = 8000;
-		}
 		}
 		else
 		{
@@ -303,6 +304,12 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 
 			m.idx = 0;
 			m.moveInProgress = false;
+		}
+		if(m.idx%m.sampleDiv==0)
+		{
+			m.measurCurr[m.idx/m.sampleDiv] = m.actualCurr;
+			m.measurSpeed[m.idx/m.sampleDiv] = m.actualSpeed;
+			m.measurPos[m.idx/m.sampleDiv] = m.actualPos;
 		}
 	}
 }
@@ -519,7 +526,7 @@ void transmitData()
 		  float time = 0;
 		  for(int i=0;i<=8000;i++)
 		  {
-			  time = i*Ts;
+			  time = i*Ts*m.sampleDiv;
 			  // AA 55 ILE B1 B2 ... Bn
 
 			  tmp[0] = 0xAA;
@@ -565,32 +572,20 @@ void changeDir(Direction dir)
 void defaultMotorMove()
 {
 
-	static uint32_t tmp = 0;
-	if(m.moveInProgress == false) tmp=HAL_GetTick();
-
-	m.moveInProgress = true;
-	if(HAL_GetTick() - tmp<200)
-	{
-		changeDir(LEFT_DIR);
-		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1, 3000);
-	}
-	else if((HAL_GetTick()-tmp>=200) && (HAL_GetTick()-tmp<400))
-	{
-		changeDir(RIGHT_DIR);
-		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1, 3000);
-	}
-	else
-	{
-		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,0);
-		changeDir(STOP_DIR);
-		HAL_ADC_Stop_DMA(&hadc2);
-		m.idx = 0;
-		m.endMeasurFlag = true;
-		m.moveInProgress = false;
-		mode = STOP_MODE;
-	}
 }
 
+void currControlMotorMove()
+{
+
+}
+void speedControlMotorMove()
+{
+
+}
+void posControlMotorMove()
+{
+
+}
 void controlMotorMove()
 {
 	static uint32_t tmp = 0;
@@ -650,7 +645,7 @@ void controlMotor()
 void regulator_PID_curr()
 {
 	static uint16_t new_pwm = 0;
-	float e = m.refCurr - m.measurCurr[m.idx];
+	float e = m.refCurr - m.actualCurr;
 
 	float pid_P = c_c.Kp*e;
 	float pid_I = c_c.pid_I_prev + Ts*(e*c_c.Kp-c_c.Kaw*(c_c.y-c_c.y_curr));
@@ -684,7 +679,7 @@ void regulator_PID_curr()
 
 void regulator_PID_speed()
 {
-	float e = m.refSpeed - m.measurSpeed[m.idx];
+	float e = m.refSpeed - m.actualSpeed;
 
 	float pid_P = s_c.Kp*e;
 	float pid_I = s_c.pid_I_prev + Ts*(e*s_c.Kp-s_c.Kaw*(s_c.y-s_c.y_speed));
@@ -705,7 +700,7 @@ void regulator_PID_speed()
 
 void regulator_PID_pos()
 {
-	float e = m.refPos - m.measurPos[m.idx];
+	float e = m.refPos - m.actualPos;
 
 	float pid_P = p_c.Kp*e;
 	float pid_I = p_c.pid_I_prev + Ts*(e*p_c.Kp-p_c.Kaw*(p_c.y-p_c.y_pos));
