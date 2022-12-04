@@ -54,6 +54,7 @@ typedef struct
 	uint16_t valueLoad;
 
 	uint16_t idx;
+	uint16_t sampleCounter;
 	bool endMeasurFlag;
 	bool moveInProgress;
 	uint32_t dmaMeasurCurr;
@@ -70,6 +71,7 @@ typedef struct
 	uint8_t tmpData[FRAME_RECIVE_WIDITH];
 	uint8_t stateRx;
 	uint8_t sampleDiv;
+
 
 	float timeValuePattern[5];
 	float refValuePattern[5];
@@ -156,9 +158,8 @@ void recivePosPIDParameters();
 
 void setRefValue(float *refValue);
 void setMotorLoad();
+void stopMotor();
 
-void controlMotor2();
-void controlMotor();
 void defaultMotorMove();
 void currControlMotorMove();
 void speedControlMotorMove();
