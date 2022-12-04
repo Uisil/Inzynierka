@@ -439,7 +439,7 @@ void transmitData()
 
 			  tmp[0] = 0xAA;
 			  tmp[1] = 0x55;
-			  tmp[2] = (uint8_t)m.sampleCounter>>8;
+			  tmp[2] = (uint8_t)(m.sampleCounter>>8);
 			  tmp[3] = (uint8_t)m.sampleCounter;
 
 			  ptr = (uint8_t *)&time;
