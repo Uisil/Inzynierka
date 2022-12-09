@@ -171,7 +171,8 @@ void speedCalc()
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
-	if(hadc->Instance == ADC2)
+	bool dir = (htim8.Instance->CR1==33);
+	if((hadc->Instance == ADC2)&&dir)
 	{
 		if(mode!=STOP_MODE)
 		{
@@ -595,17 +596,22 @@ void regulator_PID_curr()
 	else if(c_c.y < -c_c.sat) c_c.y_curr = -c_c.sat;
 	else c_c.y_curr = c_c.y;
 
-	if(c_c.y_curr>=0)
+	if(c_c.y_curr>0.1)
 	{
 		changeDir(RIGHT_DIR);
 		new_pwm = (uint16_t)(6000*c_c.y_curr);
 		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,new_pwm);
 	}
-	else
+	else if(c_c.y_curr<-0.1)
 	{
 		changeDir(LEFT_DIR);
 		new_pwm = (uint16_t)(6000*(-1*c_c.y_curr));
 		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1, new_pwm);
+	}
+	else
+	{
+		changeDir(STOP_DIR);
+		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1, 0);
 	}
 }
 
