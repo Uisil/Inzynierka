@@ -23,9 +23,10 @@ void initPeripherals()
 	HAL_TIM_Encoder_Start(&htim1, TIM_CHANNEL_ALL);
 	__HAL_TIM_SET_COUNTER(&htim1,0);
 	HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_1);
+	__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,3000);
 	HAL_UARTEx_ReceiveToIdle_DMA(&huart2, m.tmpData, FRAME_RECIVE_WIDITH);
 	HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
-	HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 4000);// 610 TO WARTOŚĆ 0.140 V
+	HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 2000);// 610 TO WARTOŚĆ 0.140 V
 	HAL_ADC_Start_DMA(&hadc2, &m.dmaMeasurCurr, 1);
 }
 
@@ -171,15 +172,18 @@ void speedCalc()
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
+	//HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_0);
+
 	bool dir = (htim8.Instance->CR1==33);
 	if((hadc->Instance == ADC2)&&dir)
 	{
+		m.actualCurr = -1*(0.01403*m.dmaMeasurCurr-23.81);
 		if(mode!=STOP_MODE)
 		{
 			m.time=Ts*m.idx; // wyznaczanie czasu próbki
 
 			// konwersja pomiaru pradu
-			m.actualCurr = -1*(0.00395522*m.dmaMeasurCurr-3.68421159-8.6);
+			m.actualCurr = -1*(0.01403*m.dmaMeasurCurr-23.81); //-1*(0.00395522*m.dmaMeasurCurr-6.71596356);
 
 			enkoderMeasure();
 			if(mode == DEF_MODE)
@@ -535,7 +539,6 @@ void speedControlMotorMove()
 		mode = STOP_MODE;
 		m.endMeasurFlag = true;
 	}
-
 	regulator_PID_speed();
 	regulator_PID_curr();
 	if(++m.idx >= 8000) m.idx = 8000;
@@ -596,22 +599,17 @@ void regulator_PID_curr()
 	else if(c_c.y < -c_c.sat) c_c.y_curr = -c_c.sat;
 	else c_c.y_curr = c_c.y;
 
-	if(c_c.y_curr>0.1)
+	if(c_c.y_curr>=0)
 	{
 		changeDir(RIGHT_DIR);
 		new_pwm = (uint16_t)(6000*c_c.y_curr);
 		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,new_pwm);
 	}
-	else if(c_c.y_curr<-0.1)
+	else if(c_c.y_curr<0)
 	{
 		changeDir(LEFT_DIR);
 		new_pwm = (uint16_t)(6000*(-1*c_c.y_curr));
 		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1, new_pwm);
-	}
-	else
-	{
-		changeDir(STOP_DIR);
-		__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1, 0);
 	}
 }
 
