@@ -221,7 +221,8 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 
 void stopMotor()
 {
-	__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,3000);
+	__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,0);
+	HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 0);
 	changeDir(STOP_DIR);
 	m.time=0;
 	m.idx = 0;
