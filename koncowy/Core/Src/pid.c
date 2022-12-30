@@ -177,6 +177,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 	bool dir = (htim8.Instance->CR1==33);
 	if((hadc->Instance == ADC2)&&dir)
 	{
+		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_0);
 		m.actualCurr = -1*(0.01403*m.dmaMeasurCurr-23.81);
 		if(mode!=STOP_MODE)
 		{
@@ -220,7 +221,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 
 void stopMotor()
 {
-	__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,0);
+	__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,3000);
 	changeDir(STOP_DIR);
 	m.time=0;
 	m.idx = 0;
