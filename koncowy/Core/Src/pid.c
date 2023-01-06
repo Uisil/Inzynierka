@@ -52,10 +52,18 @@ void initMotor()
 
 void initObserver()
 {
-	lto.Jm = 0.000025; // [kg/m^2]
+	lto.Jm = 0.0001743; // [kg/m^2]
 	lto.kt = 0.058;
 	lto.Mob = 0;
 	lto.prev_u = 0;
+	lto.Bs = 0.00581;
+
+	lto.prevFCN = 0;
+	lto.speedDif = 0;
+	lto.K = 100;
+	lto.tm = 0.025;
+
+	lto.Ra = 2.857;
 }
 
 void initControler()
@@ -63,7 +71,7 @@ void initControler()
 	mode = STOP_MODE;
 	m.endMeasurFlag = false;
 	m.moveInProgress = false;
-	m.sampleDiv = 4;
+	m.sampleDiv = 1;
 	m.sampleCounter = 0;
 }
 
@@ -115,6 +123,10 @@ void resetPID()
 
 	p_c.pid_I_prev = 0;
 	p_c.u_prev = 0;
+
+	lto.prev_u = 0;
+	lto.prevFCN = 0;
+	lto.speedDif = 0;
 
 	__HAL_TIM_SET_COUNTER(&htim1,0);
 }
@@ -209,7 +221,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 				m.sampleCounter++;
 				m.measurCurr[m.idx/m.sampleDiv] = m.actualCurr;
 				m.measurSpeed[m.idx/m.sampleDiv] = m.actualSpeed;
-				m.measurPos[m.idx/m.sampleDiv] = m.actualPos;
+				m.measurPos[m.idx/m.sampleDiv] = lto.wyFCN;
 			}
 		}
 		else
@@ -488,15 +500,25 @@ void changeDir(Direction dir)
 
 void defaultMotorMove()
 {
-	if(m.time<0.200)
+			if(m.time<0.200)
 			{
 				changeDir(LEFT_DIR);
 				__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,1500);
 			}
+/*			else if(m.time<0.200 && m.time>=0.100)
+			{
+				changeDir(LEFT_DIR);
+				__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,0);
+			}
+			else if(m.time<0.300 && m.time>=0.200)
+			{
+				changeDir(LEFT_DIR);
+				__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,1500);
+			}*/
 			else if(m.time<0.400 && m.time>=0.200)
 			{
-				changeDir(RIGHT_DIR);
-				__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,1500);
+				changeDir(LEFT_DIR);
+				__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,0);
 			}
 			else
 			{
@@ -541,6 +563,7 @@ void speedControlMotorMove()
 		mode = STOP_MODE;
 		m.endMeasurFlag = true;
 	}
+	loadTorqueObserver2();
 	regulator_PID_speed();
 	regulator_PID_curr();
 	if(++m.idx >= 8000) m.idx = 8000;
@@ -560,7 +583,7 @@ void posControlMotorMove()
 		mode = STOP_MODE;
 		m.endMeasurFlag = true;
 	}
-	loadTorqueObserver();
+	loadTorqueObserver2();
 	regulator_PID_pos();
 	regulator_PID_speed();
 	regulator_PID_curr();
@@ -661,10 +684,26 @@ void regulator_PID_pos()
 
 void loadTorqueObserver()
 {
-	float uSpeed = lto.Jm*m.measurSpeed[m.idx];
-	float speedElement = (uSpeed - lto.prev_u)/Ts;
-	float currentElement = lto.kt*m.measurCurr[m.idx];
+	float speed = (m.actualSpeed*2*3.14)/60;
+	float uSpeed = lto.Jm*speed;
+	float speedElement = (uSpeed - lto.prev_u)/(Ts*20);
+	float currentElement = lto.kt*m.actualCurr;
+	float fricElement = lto.Bs*speed - 0.041;
 
 	lto.prev_u = uSpeed;
-	lto.Mob = currentElement - speedElement;
+	lto.Mob = currentElement /*- speedElement*/ - fricElement;
+}
+
+void loadTorqueObserver2()
+{
+	if(m.idx%1 == 0)
+	{
+		float speed = (m.actualSpeed*2*3.14)/60;
+		lto.current = lto.kt*m.actualCurr;
+		lto.weFCN = lto.current - (lto.speedDif*lto.K*-1);
+		lto.wyFCN = (lto.prevFCN + Ts*lto.weFCN)/lto.tm;
+		lto.prevFCN = lto.wyFCN;
+		lto.speedDif = speed - lto.wyFCN;
+		float nap =
+	}
 }

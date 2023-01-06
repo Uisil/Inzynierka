@@ -140,6 +140,15 @@ typedef struct
 	float kt;
 	float prev_u;
 	float Mob;
+	float Bs;
+
+	float prevFCN;
+	float speedDif;
+	uint16_t K;
+	float tm;
+	float wyFCN;
+	float weFCN;
+	float current;
 }observer;
 
 void initPeripherals();
@@ -172,8 +181,9 @@ void regulator_PID_speed();
 void regulator_PID_pos();
 
 void loadTorqueObserver();
+void loadTorqueObserver2();
 
-void enkoderMeasure();;
+void enkoderMeasure();
 void speedCalc();
 void posCalc();
 
