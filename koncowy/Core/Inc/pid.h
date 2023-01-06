@@ -149,6 +149,8 @@ typedef struct
 	float wyFCN;
 	float weFCN;
 	float current;
+
+	float Ra;
 }observer;
 
 void initPeripherals();
