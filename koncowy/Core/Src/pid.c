@@ -71,7 +71,7 @@ void initControler()
 	mode = STOP_MODE;
 	m.endMeasurFlag = false;
 	m.moveInProgress = false;
-	m.sampleDiv = 1;
+	m.sampleDiv = 8;
 	m.sampleCounter = 0;
 }
 
@@ -221,7 +221,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 				m.sampleCounter++;
 				m.measurCurr[m.idx/m.sampleDiv] = m.actualCurr;
 				m.measurSpeed[m.idx/m.sampleDiv] = m.actualSpeed;
-				m.measurPos[m.idx/m.sampleDiv] = lto.wyFCN;
+				m.measurPos[m.idx/m.sampleDiv] = lto.Mob;
 			}
 		}
 		else
@@ -563,7 +563,7 @@ void speedControlMotorMove()
 		mode = STOP_MODE;
 		m.endMeasurFlag = true;
 	}
-	loadTorqueObserver2();
+	loadTorqueObserver();
 	regulator_PID_speed();
 	regulator_PID_curr();
 	if(++m.idx >= 8000) m.idx = 8000;
@@ -583,7 +583,7 @@ void posControlMotorMove()
 		mode = STOP_MODE;
 		m.endMeasurFlag = true;
 	}
-	loadTorqueObserver2();
+	loadTorqueObserver();
 	regulator_PID_pos();
 	regulator_PID_speed();
 	regulator_PID_curr();
@@ -651,7 +651,7 @@ void regulator_PID_speed()
 	s_c.u_prev = pid_P;
 
 	s_c.y = pid_P + pid_I/s_c.Ti + pid_D*s_c.Td;
-
+	//s_c.y += c_c.KffLoad*lto.Mob;
 	if(s_c.y > s_c.sat) s_c.y_speed = s_c.sat;
 	else if(s_c.y < -s_c.sat) s_c.y_speed = -s_c.sat;
 	else s_c.y_speed = s_c.y;
@@ -686,12 +686,14 @@ void loadTorqueObserver()
 {
 	float speed = (m.actualSpeed*2*3.14)/60;
 	float uSpeed = lto.Jm*speed;
-	float speedElement = (uSpeed - lto.prev_u)/(Ts*20);
+	float speedElement = (uSpeed - lto.prev_u)/(Ts);
 	float currentElement = lto.kt*m.actualCurr;
-	float fricElement = lto.Bs*speed - 0.041;
+	float fricElement = (lto.Bs+0.001)*speed;
 
 	lto.prev_u = uSpeed;
-	lto.Mob = currentElement /*- speedElement*/ - fricElement;
+	lto.Mob = currentElement - speedElement - fricElement;
+	lto.Mob = lto.prevFCN + 0.01*(lto.Mob - lto.prevFCN);
+	lto.prevFCN = lto.Mob;
 }
 
 void loadTorqueObserver2()
@@ -699,11 +701,28 @@ void loadTorqueObserver2()
 	if(m.idx%1 == 0)
 	{
 		float speed = (m.actualSpeed*2*3.14)/60;
-		lto.current = lto.kt*m.actualCurr;
-		lto.weFCN = lto.current - (lto.speedDif*lto.K*-1);
+		//lto.current = lto.kt*m.actualCurr;
+		//lto.weFCN = lto.current - (lto.speedDif*lto.K*-1);
 		lto.wyFCN = (lto.prevFCN + Ts*lto.weFCN)/lto.tm;
+		//lto.prevFCN = lto.wyFCN;
+		//lto.speedDif = speed - lto.wyFCN;
+		float nap = 0;
+		if(c_c.y_curr>=0)
+			nap = c_c.y_curr*24.5;
+		else
+			nap = -1*c_c.y_curr*24.5;
+
+		float curr = m.actualCurr*lto.Ra;
+		lto.speedDif = (nap - curr)/lto.kt;
+		lto.wyFCN = lto.prevFCN + 0.1*(lto.speedDif - lto.prevFCN);
 		lto.prevFCN = lto.wyFCN;
-		lto.speedDif = speed - lto.wyFCN;
-		float nap =
+		lto.Mob = speed - lto.wyFCN;
+		lto.wyFCN2 = (lto.prevFCN2 + Ts*lto.weFCN2)/0.01;
+		lto.prevFCN2 = lto.wyFCN;
+		if(m.time<0.05)
+		{
+			lto.Mob = 0;
+		}
+
 	}
 }

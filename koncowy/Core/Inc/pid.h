@@ -143,11 +143,14 @@ typedef struct
 	float Bs;
 
 	float prevFCN;
+	float prevFCN2;
 	float speedDif;
 	uint16_t K;
 	float tm;
 	float wyFCN;
 	float weFCN;
+	float wyFCN2;
+	float weFCN2;
 	float current;
 
 	float Ra;
