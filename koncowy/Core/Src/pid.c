@@ -206,14 +206,17 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 			if(mode == CURR_MODE)
 			{
 				currControlMotorMove();
+				m.sampleDiv = 1;
 			}
 			if(mode == SPEED_MODE)
 			{
 				speedControlMotorMove();
+				m.sampleDiv = 8;
 			}
 			if(mode == POS_MODE)
 			{
 				posControlMotorMove();
+				m.sampleDiv = 8;
 			}
 
 			if(m.idx%m.sampleDiv==0)
@@ -221,7 +224,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 				m.sampleCounter++;
 				m.measurCurr[m.idx/m.sampleDiv] = m.actualCurr;
 				m.measurSpeed[m.idx/m.sampleDiv] = m.actualSpeed;
-				m.measurPos[m.idx/m.sampleDiv] = lto.Mob;
+				m.measurPos[m.idx/m.sampleDiv] = m.actualPos;
 			}
 		}
 		else
@@ -236,7 +239,7 @@ void stopMotor()
 	__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,0);
 	HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 0);
 	changeDir(STOP_DIR);
-	m.time=0;
+	m.time = 0;
 	m.idx = 0;
 	m.moveInProgress = false;
 }
@@ -546,7 +549,8 @@ void currControlMotorMove()
 	}
 
 	regulator_PID_curr();
-	if(++m.idx >= 8000) m.idx = 8000;
+	m.idx++;
+	//if(++m.idx >= 8000) m.idx = 8000;
 }
 void speedControlMotorMove()
 {
@@ -566,7 +570,8 @@ void speedControlMotorMove()
 	loadTorqueObserver();
 	regulator_PID_speed();
 	regulator_PID_curr();
-	if(++m.idx >= 8000) m.idx = 8000;
+	m.idx++;
+	//if(++m.idx >= 8000) m.idx = 8000;
 }
 void posControlMotorMove()
 {
@@ -587,7 +592,8 @@ void posControlMotorMove()
 	regulator_PID_pos();
 	regulator_PID_speed();
 	regulator_PID_curr();
-	if(++m.idx >= 8000) m.idx = 8000;
+	m.idx++;
+	//if(++m.idx >= 8000) m.idx = 8000;
 }
 
 void setMotorLoad()
