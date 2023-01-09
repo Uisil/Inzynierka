@@ -67,6 +67,8 @@ typedef struct
 	volatile float simTime;
 	volatile float time;
 
+	uint8_t tmp;
+
 	uint8_t tmpRx;
 	uint8_t tmpData[FRAME_RECIVE_WIDITH];
 	uint8_t stateRx;

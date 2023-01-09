@@ -23,10 +23,10 @@ void initPeripherals()
 	HAL_TIM_Encoder_Start(&htim1, TIM_CHANNEL_ALL);
 	__HAL_TIM_SET_COUNTER(&htim1,0);
 	HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_1);
-	__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,3000);
+	__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,0);
 	HAL_UARTEx_ReceiveToIdle_DMA(&huart2, m.tmpData, FRAME_RECIVE_WIDITH);
 	HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
-	HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 2000);// 610 TO WARTOŚĆ 0.140 V
+	HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 0);// 610 TO WARTOŚĆ 0.140 V
 	HAL_ADC_Start_DMA(&hadc2, &m.dmaMeasurCurr, 1);
 }
 
@@ -71,6 +71,7 @@ void initControler()
 	mode = STOP_MODE;
 	m.endMeasurFlag = false;
 	m.moveInProgress = false;
+	m.tmp = 0; // zmienna tymczasowa ogólnego użytku
 	m.sampleDiv = 8;
 	m.sampleCounter = 0;
 }
@@ -187,9 +188,9 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 	//HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_0);
 
 	bool dir = (htim8.Instance->CR1==33);
-	if((hadc->Instance == ADC2)&&dir)
+	if(((hadc->Instance == ADC2)&&dir)&& m.moveInProgress)
 	{
-		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_0);
+		//HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_0);
 		m.actualCurr = -1*(0.01403*m.dmaMeasurCurr-23.81);
 		if(mode!=STOP_MODE)
 		{
@@ -202,6 +203,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 			if(mode == DEF_MODE)
 			{
 				defaultMotorMove();
+				m.sampleDiv=8;
 			}
 			if(mode == CURR_MODE)
 			{
@@ -270,6 +272,13 @@ void reciveData()
 	if(tmpDecoding<0.00001) s_c.Ti = 100000000;
 	tmpDecoding = p_c.Ti - 0;
 	if(tmpDecoding<0.00001) p_c.Ti = 100000000;
+	m.tmp++;
+
+	if(m.tmp==2)
+	{
+		m.tmp=0;
+		m.moveInProgress = true;
+	}
 
 }
 
@@ -520,8 +529,8 @@ void defaultMotorMove()
 			}*/
 			else if(m.time<0.400 && m.time>=0.200)
 			{
-				changeDir(LEFT_DIR);
-				__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,0);
+				changeDir(RIGHT_DIR);
+				__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1,1500);
 			}
 			else
 			{
