@@ -694,11 +694,11 @@ void loadTorqueObserver()
 	float uSpeed = lto.Jm*speed;
 	float speedElement = (uSpeed - lto.prev_u)/(Ts);
 	float currentElement = lto.kt*m.actualCurr;
-	float fricElement = (lto.Bs+0.001)*speed;
+	float fricElement = (lto.Bs-0.00425)*speed;
 
 	lto.prev_u = uSpeed;
 	lto.Mob = currentElement - speedElement - fricElement;
-	lto.Mob = lto.prevFCN + 0.01*(lto.Mob - lto.prevFCN);
+	lto.Mob = lto.prevFCN + 0.001*(lto.Mob - lto.prevFCN);
 	lto.prevFCN = lto.Mob;
 }
 
