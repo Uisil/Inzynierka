@@ -53,7 +53,7 @@ typedef struct
 	volatile float refPos;
 	uint16_t valueLoad;
 
-	uint16_t idx;
+	uint32_t idx;
 	uint16_t sampleCounter;
 	bool endMeasurFlag;
 	bool moveInProgress;

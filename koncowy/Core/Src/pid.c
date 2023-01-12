@@ -666,7 +666,6 @@ void regulator_PID_speed()
 	s_c.u_prev = pid_P;
 
 	s_c.y = pid_P + pid_I/s_c.Ti + pid_D*s_c.Td;
-	//s_c.y += c_c.KffLoad*lto.Mob;
 	if(s_c.y > s_c.sat) s_c.y_speed = s_c.sat;
 	else if(s_c.y < -s_c.sat) s_c.y_speed = -s_c.sat;
 	else s_c.y_speed = s_c.y;
