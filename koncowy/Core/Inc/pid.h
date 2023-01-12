@@ -27,7 +27,7 @@
 #define INA_PIN GPIO_PIN_11
 #define INB_PIN GPIO_PIN_7
 #define DIR_PORT GPIOA
-#define FRAME_RECIVE_WIDITH 6+30*4
+#define FRAME_RECIVE_WIDITH 1+35*4
 typedef enum
 {
 	DEF_MODE,
@@ -78,7 +78,7 @@ typedef struct
 	float timeValuePattern[5];
 	float refValuePattern[5];
 	float timeLoadPattern[5];
-	uint16_t valueLoadPattern[5];
+	float valueLoadPattern[5];
 }motor;
 
 typedef struct
