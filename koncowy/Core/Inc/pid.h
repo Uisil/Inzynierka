@@ -27,7 +27,7 @@
 #define INA_PIN GPIO_PIN_11
 #define INB_PIN GPIO_PIN_7
 #define DIR_PORT GPIOA
-#define FRAME_RECIVE_WIDITH 1+35*4
+#define FRAME_RECIVE_WIDITH 3+35*4
 typedef enum
 {
 	DEF_MODE,

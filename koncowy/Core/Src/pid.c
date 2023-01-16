@@ -67,8 +67,8 @@ void initObserver()
 	lto.tm = 0.9;
 
 	lto.Ra = 2.857;
-	lto.l1 = 60;
-	lto.l2 = -0.1;
+	lto.l1 = 10000;
+	lto.l2 = -5;
 }
 
 void initControler()
@@ -174,6 +174,14 @@ void enkoderMeasure()
 void posCalc()
 {
 	mSpeed.diff = (mSpeed.enkoder_cnt - mSpeed.enkoder_cnt_old);
+	if(mSpeed.diff>1000)
+	{
+		mSpeed.diff = (-32768+mSpeed.enkoder_cnt_old) - (32768-mSpeed.enkoder_cnt);
+	}
+	else if(mSpeed.diff<-1000)
+	{
+		mSpeed.diff = (32768-mSpeed.enkoder_cnt_old) + (mSpeed.enkoder_cnt + 32768);
+	}
 	mSpeed.enkoder_tmp += mSpeed.diff;
 	mSpeed.enkoder_cnt_old = mSpeed.enkoder_cnt;
 	m.actualPos = (float)mSpeed.enkoder_tmp/(resolution*enkoder_cyclic_cnt);
@@ -187,6 +195,14 @@ void speedCalc()
 	mSpeed.ringbuffer[mSpeed.idx] = mSpeed.enkoder_cnt;
 
 	mSpeed.diff = (mSpeed.enkoder_cnt - mSpeed.tmp);
+	if(mSpeed.diff>1000)
+	{
+		mSpeed.diff = (-32768+mSpeed.tmp) - (32768-mSpeed.enkoder_cnt);
+	}
+	else if(mSpeed.diff<-1000)
+	{
+		mSpeed.diff = (32768-mSpeed.tmp) + (mSpeed.enkoder_cnt + 32768);
+	}
 	m.actualSpeed = (60*(float)mSpeed.diff*enkoder_freq/100)/(resolution*enkoder_cyclic_cnt);
 }
 
@@ -233,7 +249,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 				m.sampleCounter++;
 				m.measurCurr[m.idx/m.sampleDiv] = m.actualCurr;
 				m.measurSpeed[m.idx/m.sampleDiv] = m.actualSpeed;
-				m.measurPos[m.idx/m.sampleDiv] = m.refCurr/*(lto.wyFCN2*60)/(2*PI)*/;
+				m.measurPos[m.idx/m.sampleDiv] = m.actualPos/*(lto.wyFCN2*60)/(2*PI)*/;
 			}
 		}
 		else
@@ -268,23 +284,30 @@ void reciveData()
 	 * s_c.Kp, s_c.Ti, s_c.Td, s_c.Kff, s_c.Kaw, m.refSpeed
 	 * p_c.Kp, p_c.Ti, p_c.Td, p_c.Kff, p_c.Kaw, m.refPos
 	 * */
-	reciveMotorParameters();
-	reciveCurrPIDParameters();
-	reciveSpeedPIDParameters();
-	recivePosPIDParameters();
+	if(m.tmpData[0] == 16 && m.tmpData[1] == 18)
+	{
+		reciveMotorParameters();
+		reciveCurrPIDParameters();
+		reciveSpeedPIDParameters();
+		recivePosPIDParameters();
 
-	float tmpDecoding = c_c.Ti - 0;
-	if(tmpDecoding<0.00001) c_c.Ti = 100000000;
-	tmpDecoding = s_c.Ti - 0;
-	if(tmpDecoding<0.00001) s_c.Ti = 100000000;
-	tmpDecoding = p_c.Ti - 0;
-	if(tmpDecoding<0.00001) p_c.Ti = 100000000;
-	m.tmp++;
+		float tmpDecoding = c_c.Ti - 0;
+		if(tmpDecoding<0.00001) c_c.Ti = 100000000;
+		tmpDecoding = s_c.Ti - 0;
+		if(tmpDecoding<0.00001) s_c.Ti = 100000000;
+		tmpDecoding = p_c.Ti - 0;
+		if(tmpDecoding<0.00001) p_c.Ti = 100000000;
+		m.tmp++;
 
-	if(m.tmp==2)
+		if(m.tmp==2)
+		{
+			m.tmp=0;
+			m.moveInProgress = true;
+		}
+	}
+	else
 	{
 		m.tmp=0;
-		m.moveInProgress = true;
 	}
 
 }
@@ -294,18 +317,18 @@ void reciveMotorParameters()
 	uint8_t *ptr;
 	int parameterNo;
 
-	if(m.tmpData[0] == 0) mode = DEF_MODE;
-	else if(m.tmpData[0] == 1) mode = CURR_MODE;
-	else if(m.tmpData[0] == 2) mode = SPEED_MODE;
-	else if(m.tmpData[0] == 3) mode = POS_MODE;
-	else if(m.tmpData[0] == 4) mode = STOP_MODE;
+	if(m.tmpData[2] == 0) mode = DEF_MODE;
+	else if(m.tmpData[2] == 1) mode = CURR_MODE;
+	else if(m.tmpData[2] == 2) mode = SPEED_MODE;
+	else if(m.tmpData[2] == 3) mode = POS_MODE;
+	else if(m.tmpData[2] == 4) mode = STOP_MODE;
 
 	reciveLoadPattern();
 	reciveRefPattern();
 
 	parameterNo = 20;
 	ptr = (uint8_t *)&m.simTime;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 }
 
 void reciveRefPattern()
@@ -316,44 +339,44 @@ void reciveRefPattern()
 	// odbiór wartości paternu dla sygnału referencyjnego
 	parameterNo = 10;
 	ptr = (uint8_t *)&m.refValuePattern[0];
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 11;
 	ptr = (uint8_t *)&m.refValuePattern[1];
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 12;
 	ptr = (uint8_t *)&m.refValuePattern[2];
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 13;
 	ptr = (uint8_t *)&m.refValuePattern[3];
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 14;
 	ptr = (uint8_t *)&m.refValuePattern[4];
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	// odbiór czasów paternu dla sygnału referencyjnego
 	parameterNo = 15;
 	ptr = (uint8_t *)&m.timeValuePattern[0];
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 16;
 	ptr = (uint8_t *)&m.timeValuePattern[1];
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 17;
 	ptr = (uint8_t *)&m.timeValuePattern[2];
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 18;
 	ptr = (uint8_t *)&m.timeValuePattern[3];
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 19;
 	ptr = (uint8_t *)&m.timeValuePattern[4];
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 }
 
 void reciveLoadPattern()
@@ -364,54 +387,54 @@ void reciveLoadPattern()
 	// odbiór wartości paternu dla obciążenia
 	parameterNo = 0;
 	ptr = (uint8_t *)&m.valueLoadPattern[0];
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 	//m.valueLoadPattern[0]=(m.valueLoadPattern[0]*(41.5-38)/100)+38;
 	m.valueLoadPattern[0]=m.valueLoadPattern[0]*4096/100;
 
 	parameterNo = 1;
 	ptr = (uint8_t *)&m.valueLoadPattern[1];
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 	//m.valueLoadPattern[1]=(m.valueLoadPattern[1]*(41.5-38)/100)+38;
 	m.valueLoadPattern[1]=m.valueLoadPattern[1]*4096/100;
 
 	parameterNo = 2;
 	ptr = (uint8_t *)&m.valueLoadPattern[2];
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 	//m.valueLoadPattern[2]=(m.valueLoadPattern[2]*(41.5-38)/100)+38;
 	m.valueLoadPattern[2]=m.valueLoadPattern[2]*4096/100;
 
 	parameterNo = 3;
 	ptr = (uint8_t *)&m.valueLoadPattern[3];
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 	//m.valueLoadPattern[3]=(m.valueLoadPattern[3]*(41.5-38)/100)+38;
 	m.valueLoadPattern[3]=m.valueLoadPattern[3]*4096/100;
 
 	parameterNo = 4;
 	ptr = (uint8_t *)&m.valueLoadPattern[4];
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 	//m.valueLoadPattern[4]=(m.valueLoadPattern[4]*(41.5-38)/100)+38;
 	m.valueLoadPattern[4]=m.valueLoadPattern[4]*4096/100;
 
 	// odbiór czasów paternu dla obciążenia
 	parameterNo = 5;
 	ptr = (uint8_t *)&m.timeLoadPattern[0];
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 6;
 	ptr = (uint8_t *)&m.timeLoadPattern[1];
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 7;
 	ptr = (uint8_t *)&m.timeLoadPattern[2];
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 8;
 	ptr = (uint8_t *)&m.timeLoadPattern[3];
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 9;
 	ptr = (uint8_t *)&m.timeLoadPattern[4];
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 }
 
 void reciveCurrPIDParameters()
@@ -421,19 +444,19 @@ void reciveCurrPIDParameters()
 
 	parameterNo = 21;
 	ptr = (uint8_t *)&c_c.Kp;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 22;
 	ptr = (uint8_t *)&c_c.Ti;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 23;
 	ptr = (uint8_t *)&c_c.Td;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 24;
 	ptr = (uint8_t *)&c_c.Kaw;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 }
 
 void reciveSpeedPIDParameters()
@@ -443,19 +466,19 @@ void reciveSpeedPIDParameters()
 
 	parameterNo = 25;
 	ptr = (uint8_t *)&s_c.Kp;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 26;
 	ptr = (uint8_t *)&s_c.Ti;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 27;
 	ptr = (uint8_t *)&s_c.Td;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 28;
 	ptr = (uint8_t *)&s_c.Kaw;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 }
 
 void recivePosPIDParameters()
@@ -465,27 +488,27 @@ void recivePosPIDParameters()
 
 	parameterNo = 29;
 	ptr = (uint8_t *)&p_c.Kp;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 30;
 	ptr = (uint8_t *)&p_c.Ti;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 31;
 	ptr = (uint8_t *)&p_c.Td;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 32;
-	ptr = (uint8_t *)&lto.l1;//p_c.Kff;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	ptr = (uint8_t *)&p_c.Kff;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 33;
 	ptr = (uint8_t *)&c_c.KffLoad;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 
 	parameterNo = 34;
-	ptr = (uint8_t *)&lto.l2;//p_c.Kaw;
-	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	ptr = (uint8_t *)&p_c.Kaw;
+	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[3+parameterNo*sizeof(float)+i];
 }
 
 void transmitData()
