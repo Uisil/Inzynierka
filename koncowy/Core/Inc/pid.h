@@ -143,6 +143,8 @@ typedef struct
 	float prev_u;
 	float Mob;
 	float Bs;
+	float l1;
+	float l2;
 
 	float prevFCN;
 	float prevFCN2;
@@ -189,6 +191,7 @@ void regulator_PID_pos();
 
 void loadTorqueObserver();
 void loadTorqueObserver2();
+void loadTorqueObserver3();
 
 void enkoderMeasure();
 void speedCalc();

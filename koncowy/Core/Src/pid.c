@@ -7,6 +7,8 @@
 
 #include "pid.h"
 
+#define PI 3.1415926535897932384626433832795
+
 Direction dir;
 motorMode mode;
 motor m;
@@ -52,18 +54,21 @@ void initMotor()
 
 void initObserver()
 {
-	lto.Jm = 0.0001743; // [kg/m^2]
-	lto.kt = 0.058;
+	lto.Jm = 0.00005732/*0.0001743*/; // [kg/m^2]
+	lto.kt = 0.055;
 	lto.Mob = 0;
+	lto.wyFCN2 = 0;
 	lto.prev_u = 0;
-	lto.Bs = 0.00581;
+	lto.Bs = 0.00006369/*0.00581*/;
 
 	lto.prevFCN = 0;
 	lto.speedDif = 0;
 	lto.K = 100;
-	lto.tm = 0.025;
+	lto.tm = 0.9;
 
 	lto.Ra = 2.857;
+	lto.l1 = 60;
+	lto.l2 = -0.1;
 }
 
 void initControler()
@@ -128,6 +133,8 @@ void resetPID()
 	lto.prev_u = 0;
 	lto.prevFCN = 0;
 	lto.speedDif = 0;
+	lto.Mob = 0;
+	lto.wyFCN2 = 0;
 
 	__HAL_TIM_SET_COUNTER(&htim1,0);
 }
@@ -226,7 +233,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 				m.sampleCounter++;
 				m.measurCurr[m.idx/m.sampleDiv] = m.actualCurr;
 				m.measurSpeed[m.idx/m.sampleDiv] = m.actualSpeed;
-				m.measurPos[m.idx/m.sampleDiv] = m.actualPos;
+				m.measurPos[m.idx/m.sampleDiv] = m.refCurr/*(lto.wyFCN2*60)/(2*PI)*/;
 			}
 		}
 		else
@@ -358,26 +365,31 @@ void reciveLoadPattern()
 	parameterNo = 0;
 	ptr = (uint8_t *)&m.valueLoadPattern[0];
 	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	//m.valueLoadPattern[0]=(m.valueLoadPattern[0]*(41.5-38)/100)+38;
 	m.valueLoadPattern[0]=m.valueLoadPattern[0]*4096/100;
 
 	parameterNo = 1;
 	ptr = (uint8_t *)&m.valueLoadPattern[1];
 	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	//m.valueLoadPattern[1]=(m.valueLoadPattern[1]*(41.5-38)/100)+38;
 	m.valueLoadPattern[1]=m.valueLoadPattern[1]*4096/100;
 
 	parameterNo = 2;
 	ptr = (uint8_t *)&m.valueLoadPattern[2];
 	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	//m.valueLoadPattern[2]=(m.valueLoadPattern[2]*(41.5-38)/100)+38;
 	m.valueLoadPattern[2]=m.valueLoadPattern[2]*4096/100;
 
 	parameterNo = 3;
 	ptr = (uint8_t *)&m.valueLoadPattern[3];
 	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	//m.valueLoadPattern[3]=(m.valueLoadPattern[3]*(41.5-38)/100)+38;
 	m.valueLoadPattern[3]=m.valueLoadPattern[3]*4096/100;
 
 	parameterNo = 4;
 	ptr = (uint8_t *)&m.valueLoadPattern[4];
 	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
+	//m.valueLoadPattern[4]=(m.valueLoadPattern[4]*(41.5-38)/100)+38;
 	m.valueLoadPattern[4]=m.valueLoadPattern[4]*4096/100;
 
 	// odbiór czasów paternu dla obciążenia
@@ -464,7 +476,7 @@ void recivePosPIDParameters()
 	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
 
 	parameterNo = 32;
-	ptr = (uint8_t *)&p_c.Kff;
+	ptr = (uint8_t *)&lto.l1;//p_c.Kff;
 	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
 
 	parameterNo = 33;
@@ -472,7 +484,7 @@ void recivePosPIDParameters()
 	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
 
 	parameterNo = 34;
-	ptr = (uint8_t *)&p_c.Kaw;
+	ptr = (uint8_t *)&lto.l2;//p_c.Kaw;
 	for(int i = 0;i < sizeof(float);i++) ptr[i] = m.tmpData[1+parameterNo*sizeof(float)+i];
 }
 
@@ -596,7 +608,8 @@ void speedControlMotorMove()
 		mode = STOP_MODE;
 		m.endMeasurFlag = true;
 	}
-	loadTorqueObserver();
+	//if(m.idx%10 == 0)
+	loadTorqueObserver3();
 	regulator_PID_speed();
 	regulator_PID_curr();
 	m.idx++;
@@ -722,41 +735,33 @@ void loadTorqueObserver()
 	float uSpeed = lto.Jm*speed;
 	float speedElement = (uSpeed - lto.prev_u)/(Ts);
 	float currentElement = lto.kt*m.actualCurr;
-	float fricElement = (lto.Bs-0.00425)*speed;
+	float fricElement = (lto.Bs/*-0.00425*/)*speed;
 
 	lto.prev_u = uSpeed;
-	lto.Mob = currentElement - speedElement - fricElement;
-	lto.Mob = lto.prevFCN + 0.001*(lto.Mob - lto.prevFCN);
+	lto.Mob = currentElement - speedElement - fricElement-0.066;
+	lto.Mob = lto.prevFCN + 0.1*(lto.Mob - lto.prevFCN);
 	lto.prevFCN = lto.Mob;
 }
 
 void loadTorqueObserver2()
 {
-	if(m.idx%1 == 0)
-	{
-		float speed = (m.actualSpeed*2*3.14)/60;
-		//lto.current = lto.kt*m.actualCurr;
-		//lto.weFCN = lto.current - (lto.speedDif*lto.K*-1);
-		lto.wyFCN = (lto.prevFCN + Ts*lto.weFCN)/lto.tm;
-		//lto.prevFCN = lto.wyFCN;
-		//lto.speedDif = speed - lto.wyFCN;
-		float nap = 0;
-		if(c_c.y_curr>=0)
-			nap = c_c.y_curr*24.5;
-		else
-			nap = -1*c_c.y_curr*24.5;
+	float speed = (m.actualSpeed*2*3.14)/60;
+	float current = lto.kt*m.actualCurr;
+	float vel = speed*lto.l1;
+	float obser_speed = current + vel - lto.Mob/lto.Jm - lto.wyFCN2*lto.l1;
+	lto.wyFCN2 = lto.wyFCN2+ Ts*obser_speed;
+	float diff_speed = speed-lto.wyFCN2;
+	lto.Mob = lto.l2*(lto.Mob+ Ts*diff_speed);
+}
 
-		float curr = m.actualCurr*lto.Ra;
-		lto.speedDif = (nap - curr)/lto.kt;
-		lto.wyFCN = lto.prevFCN + 0.1*(lto.speedDif - lto.prevFCN);
-		lto.prevFCN = lto.wyFCN;
-		lto.Mob = speed - lto.wyFCN;
-		lto.wyFCN2 = (lto.prevFCN2 + Ts*lto.weFCN2)/0.01;
-		lto.prevFCN2 = lto.wyFCN;
-		if(m.time<0.05)
-		{
-			lto.Mob = 0;
-		}
-
-	}
+void loadTorqueObserver3()
+{
+	float speed = (m.actualSpeed*2*PI)/60;
+	float current = lto.kt*m.actualCurr - 0.0715;
+	float diff_speed = speed-lto.wyFCN2;
+	lto.Mob = (lto.Mob+ Ts*lto.l2*diff_speed);
+	//lto.Mob = lto.prevFCN + 0.1*(lto.Mob - lto.prevFCN);
+	//lto.prevFCN = lto.Mob;
+	float obser_speed = current + diff_speed*lto.l1*lto.Jm - lto.Mob;
+	lto.wyFCN2 = lto.wyFCN2 + (Ts/lto.tm)*(obser_speed/lto.Bs - lto.wyFCN2);
 }
