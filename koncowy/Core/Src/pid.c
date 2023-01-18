@@ -249,7 +249,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 				m.sampleCounter++;
 				m.measurCurr[m.idx/m.sampleDiv] = m.actualCurr;
 				m.measurSpeed[m.idx/m.sampleDiv] = m.actualSpeed;
-				m.measurPos[m.idx/m.sampleDiv] = m.actualPos/*(lto.wyFCN2*60)/(2*PI)*/;
+				m.measurPos[m.idx/m.sampleDiv] = m.actualPos;
 			}
 		}
 		else
@@ -689,8 +689,6 @@ void regulator_PID_curr()
 
 	c_c.y = pid_P + pid_I/c_c.Ti + pid_D*c_c.Td;
 
-	c_c.y += c_c.KffLoad*lto.Mob; // moment obciążenia
-
 	if(c_c.y > c_c.sat) c_c.y_curr = c_c.sat;
 	else if(c_c.y < -c_c.sat) c_c.y_curr = -c_c.sat;
 	else c_c.y_curr = c_c.y;
@@ -722,6 +720,9 @@ void regulator_PID_speed()
 	s_c.u_prev = pid_P;
 
 	s_c.y = pid_P + pid_I/s_c.Ti + pid_D*s_c.Td;
+
+	s_c.y += c_c.KffLoad*lto.Mob; //moment obciążenia
+
 	if(s_c.y > s_c.sat) s_c.y_speed = s_c.sat;
 	else if(s_c.y < -s_c.sat) s_c.y_speed = -s_c.sat;
 	else s_c.y_speed = s_c.y;
